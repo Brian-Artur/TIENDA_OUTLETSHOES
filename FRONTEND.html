@@ -281,6 +281,9 @@ async function exportarTablaAPDF() {
         const specificApiUrlHistoricoStocks = "https://abincodigital.loclx.io/historico-stocks";
         const specificApiUrlConsulta = "https://abincodigital.loclx.io/consulta";
 
+        /**URL local ppara botón*/
+        const specificApiUrlFotosTemporada = "http://localhost:5000/articulos-temporada";
+
         // Elementos del DOM
         const fetchButton = document.getElementById('fetch-json');
         const reportButton = document.getElementById('fetch-report');
@@ -1881,95 +1884,259 @@ function showImageInModal(imageUrl) {
 }
 
 
-// Función para mostrar fotos por temporada
-async function mostrarFotosPorTemporada() {
-    const codigoTemporada = prompt("Introduce el código de la temporada (ej: V25, V14):");
-    if (!codigoTemporada || codigoTemporada.trim() === "") {
-        tableContainer.innerHTML = '<p class="error">Operación cancelada. No se proporcionó un código de temporada.</p>';
-        return;
-    }
+// // Función para mostrar fotos por temporada
+// async function mostrarFotosPorTemporada() {
+//     const codigoTemporada = prompt("Introduce el código de la temporada (ej: V25, V14):");
+//     if (!codigoTemporada || codigoTemporada.trim() === "") {
+//         tableContainer.innerHTML = '<p class="error">Operación cancelada. No se proporcionó un código de temporada.</p>';
+//         return;
+//     }
 
-    tableContainer.innerHTML = "Buscando artículos de la temporada...";
+//     tableContainer.innerHTML = "Buscando artículos de la temporada...";
 
-    try {
-        const response = await fetch(`https://localhost:5000/articulos-temporada?temporada=${codigoTemporada}`);
+//     try {
+//         const response = await fetch(`https://localhost:5000/articulos-temporada?temporada=${codigoTemporada}`);
+//         if (!response.ok) {
+//             throw new Error(`Error: ${response.statusText}`);
+//         }
+
+//         const jsonData = await response.json();
+
+//         if (jsonData.data && Array.isArray(jsonData.data)) {
+//             renderTablaFotosTemporada(jsonData.data, codigoTemporada);
+//         } else {
+//             tableContainer.innerHTML = '<p class="error">No se encontraron artículos para esa temporada.</p>';
+//         }
+//     } catch (error) {
+//         tableContainer.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+//     }
+// }
+
+
+
+// // Función para renderizar la tabla de fotos
+// function renderTablaFotosTemporada(data, temporada) {
+//     if (!Array.isArray(data) || data.length === 0) {
+//         tableContainer.innerHTML = "<p>No hay artículos para mostrar.</p>";
+//         return;
+//     }
+
+//     // Calcular el número de columnas (4 columnas)
+//     const columnas = 4;
+//     const filas = Math.ceil(data.length / columnas);
+
+//     let tableHtml = `
+//         <h3>Artículos de la temporada ${temporada}</h3>
+//         <table style="width: 100%; border-collapse: collapse;">
+//     `;
+
+//     for (let i = 0; i < filas; i++) {
+//         tableHtml += "<tr>";
+        
+//         for (let j = 0; j < columnas; j++) {
+//             const index = i * columnas + j;
+//             if (index >= data.length) {
+//                 tableHtml += "<td></td>";
+//                 continue;
+//             }
+
+//             const articulo = data[index];
+//             tableHtml += `
+//                 <td style="border: 1px solid #ddd; padding: 10px; text-align: center; vertical-align: top;">
+//                     <div style="height: 180px; display: flex; flex-direction: column; justify-content: space-between;">
+//                         <div style="height: 120px; display: flex; align-items: center; justify-content: center;">
+//                             ${articulo.FOTO_URL ? 
+//                                `<img src="${articulo.FOTO_URL}" style="max-height: 120px; max-width: 100%;" 
+//                                  onerror="this.onerror=null; this.src='data:image/svg+xml;charset=UTF-8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\" viewBox=\"0 0 100 100\"><rect width=\"100\" height=\"100\" fill=\"%23f0f0f0\"/><text x=\"50\" y=\"50\" font-family=\"Arial\" font-size=\"16\" fill=\"%23000\" text-anchor=\"middle\" dominant-baseline=\"middle\">NF</text></svg>';"
+//                                  alt="${articulo.REFERENCIA}">` : 
+//                                `<div style="width: 100px; height: 120px; background-color: #f0f0f0; display: flex; align-items: center; justify-content: center;">NF</div>`}
+//                         </div>
+//                         <div style="margin-top: 5px;">
+//                             <div><strong>${articulo.REFERENCIA || ''}</strong></div>
+//                             <div style="font-size: 12px;">${articulo.DESCRIPCION || ''}</div>
+//                             <div style="font-size: 12px; color: #666;">${articulo.COLOR || ''}</div>
+//                         </div>
+//                     </div>
+//                 </td>
+//             `;
+//         }
+        
+//         tableHtml += "</tr>";
+//     }
+
+//     tableHtml += "</table>";
+//     document.getElementById("table-container").innerHTML = tableHtml;
+// }
+
+        // Obtén referencia al botón de fotos temporada
+        const fotosTemporadaButton = document.getElementById('btn-fotos-temporada');
+
+        fotosTemporadaButton.addEventListener('click', function () {
+  let temporada = prompt("Indique la temporada (ej: V25, I22)");
+  if (!temporada) return;
+  temporada = temporada.toUpperCase();
+
+  let offset = 0;
+  const limit = 20;
+
+  function cargarPagina(offsetActual) {
+    tableContainer.innerHTML = '<div style="text-align: center; padding: 20px;">Cargando artículos...</div>';
+
+    fetch(`${specificApiUrlFotosTemporada}?temporada=${temporada}&offset=${offsetActual}`)
+      .then(response => {
         if (!response.ok) {
-            throw new Error(`Error: ${response.statusText}`);
+          throw new Error('Error en la respuesta del servidor');
         }
+        return response.json();
+      })
+      .then(data => {
+        tableContainer.innerHTML = '';
 
-        const jsonData = await response.json();
+        if (data.articulos && Array.isArray(data.articulos) && data.articulos.length > 0) {
+          const gallery = document.createElement('div');
+          gallery.style.display = 'flex';
+          gallery.style.flexWrap = 'wrap';
+          gallery.style.gap = '20px';
+          gallery.style.justifyContent = 'center';
 
-        if (jsonData.data && Array.isArray(jsonData.data)) {
-            renderTablaFotosTemporada(jsonData.data, codigoTemporada);
+          data.articulos.forEach(articulo => {
+            const { descripadic, foto, descripcion } = articulo;
+
+            const card = document.createElement('div');
+            card.style.width = '200px';
+            card.style.border = '1px solid #ccc';
+            card.style.borderRadius = '8px';
+            card.style.overflow = 'hidden';
+            card.style.boxShadow = '0 2px 5px rgba(0, 0, 0, 0.1)';
+            card.style.display = 'flex';
+            card.style.flexDirection = 'column';
+            card.style.textAlign = 'center';
+            card.style.backgroundColor = '#fff';
+
+            const img = document.createElement('img');
+            img.src = foto || 'https://via.placeholder.com/200x200.png?text=Sin+Imagen';
+            img.alt = descripadic || 'Artículo';
+            img.style.width = '100%';
+            img.style.height = '200px';
+            img.style.objectFit = 'contain';
+            img.style.backgroundColor = '#f9f9f9';
+
+            const title = document.createElement('h3');
+            title.textContent = descripadic || 'Sin título';
+            title.style.fontSize = '1rem';
+            title.style.margin = '10px 5px 0';
+
+            const desc = document.createElement('p');
+            desc.textContent = descripcion || '';
+            desc.style.fontSize = '0.9rem';
+            desc.style.margin = '5px 10px 10px';
+            desc.style.color = '#555';
+
+            card.appendChild(img);
+            card.appendChild(title);
+            card.appendChild(desc);
+            gallery.appendChild(card);
+          });
+
+          tableContainer.appendChild(gallery);
+
+          // Botonera de paginación
+          const controls = document.createElement('div');
+          controls.style.textAlign = 'center';
+          controls.style.marginTop = '20px';
+
+          const prevBtn = document.createElement('button');
+          prevBtn.textContent = '← Anterior';
+          prevBtn.disabled = offsetActual === 0;
+          prevBtn.style.margin = '0 10px';
+          prevBtn.onclick = () => {
+            offset -= limit;
+            if (offset < 0) offset = 0;
+            cargarPagina(offset);
+          };
+
+          const nextBtn = document.createElement('button');
+          nextBtn.textContent = 'Siguiente →';
+          nextBtn.disabled = data.articulos.length < limit;
+          nextBtn.style.margin = '0 10px';
+          nextBtn.onclick = () => {
+            offset += limit;
+            cargarPagina(offset);
+          };
+
+          controls.appendChild(prevBtn);
+          controls.appendChild(nextBtn);
+          tableContainer.appendChild(controls);
+
         } else {
-            tableContainer.innerHTML = '<p class="error">No se encontraron artículos para esa temporada.</p>';
+          tableContainer.innerHTML = '<div style="text-align: center; padding: 20px; color: red;">No se encontraron artículos para esta temporada</div>';
         }
-    } catch (error) {
-        tableContainer.innerHTML = `<p class="error">Error: ${error.message}</p>`;
-    }
-}
+      })
+      .catch(error => {
+        console.error("Error al cargar artículos:", error);
+        tableContainer.innerHTML = `<div style="text-align: center; padding: 20px; color: red;">Error al cargar artículos: ${error.message}</div>`;
+      });
+  }
+
+  cargarPagina(offset);
+});
 
 
-
-// Función para renderizar la tabla de fotos
-function renderTablaFotosTemporada(data, temporada) {
-    if (!Array.isArray(data) || data.length === 0) {
-        tableContainer.innerHTML = "<p>No hay artículos para mostrar.</p>";
-        return;
-    }
-
-    // Calcular el número de columnas (4 columnas)
-    const columnas = 4;
-    const filas = Math.ceil(data.length / columnas);
-
-    let tableHtml = `
-        <h3>Artículos de la temporada ${temporada}</h3>
-        <table style="width: 100%; border-collapse: collapse;">
-    `;
-
-    for (let i = 0; i < filas; i++) {
-        tableHtml += "<tr>";
-        
-        for (let j = 0; j < columnas; j++) {
-            const index = i * columnas + j;
-            if (index >= data.length) {
-                tableHtml += "<td></td>";
-                continue;
-            }
-
-            const articulo = data[index];
-            tableHtml += `
-                <td style="border: 1px solid #ddd; padding: 10px; text-align: center; vertical-align: top;">
-                    <div style="height: 180px; display: flex; flex-direction: column; justify-content: space-between;">
-                        <div style="height: 120px; display: flex; align-items: center; justify-content: center;">
-                            ${articulo.FOTO_URL ? 
-                               `<img src="${articulo.FOTO_URL}" style="max-height: 120px; max-width: 100%;" 
-                                 onerror="this.onerror=null; this.src='data:image/svg+xml;charset=UTF-8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\" viewBox=\"0 0 100 100\"><rect width=\"100\" height=\"100\" fill=\"%23f0f0f0\"/><text x=\"50\" y=\"50\" font-family=\"Arial\" font-size=\"16\" fill=\"%23000\" text-anchor=\"middle\" dominant-baseline=\"middle\">NF</text></svg>';"
-                                 alt="${articulo.REFERENCIA}">` : 
-                               `<div style="width: 100px; height: 120px; background-color: #f0f0f0; display: flex; align-items: center; justify-content: center;">NF</div>`}
-                        </div>
-                        <div style="margin-top: 5px;">
-                            <div><strong>${articulo.REFERENCIA || ''}</strong></div>
-                            <div style="font-size: 12px;">${articulo.DESCRIPCION || ''}</div>
-                            <div style="font-size: 12px; color: #666;">${articulo.COLOR || ''}</div>
-                        </div>
-                    </div>
-                </td>
-            `;
+/**
+        // Añade el evento click al botón
+fotosTemporadaButton.addEventListener('click', function() {
+    // Pregunta temporada
+    let temporada = prompt("Indique la temporada (ej: V25, I22)");
+    temporada = temporada.toUpperCase()
+    // Limpia el contenedor antes de cargar nuevas imágenes
+    tableContainer.innerHTML = '<div style="text-align: center; padding: 20px;">Cargando imágenes...</div>';
+    
+    fetch(`${specificApiUrlFotosTemporada}?temporada=${temporada}`)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Error en la respuesta del servidor');
         }
+        return response.json();
+      })
+      .then(data => {
+        tableContainer.innerHTML = ''; // Limpia el mensaje de carga
         
-        tableHtml += "</tr>";
-    }
-
-    tableHtml += "</table>";
-    document.getElementById("table-container").innerHTML = tableHtml;
-}
-
-// Event listener para el nuevo botón
-document.getElementById("btn-fotos-temporada").addEventListener("click", mostrarFotosPorTemporada);
-
-
-
+        if (data.imagenes && Array.isArray(data.imagenes)) {
+          // Crea un contenedor flexible para las imágenes
+          const gallery = document.createElement('div');
+          gallery.style.display = 'flex';
+          gallery.style.flexWrap = 'wrap';
+          gallery.style.gap = '10px';
+          gallery.style.justifyContent = 'center';
+          
+          data.imagenes.forEach(base64Image => {
+            const imgContainer = document.createElement('div');
+            imgContainer.style.width = '200px';
+            imgContainer.style.height = '200px';
+            imgContainer.style.overflow = 'hidden';
+            imgContainer.style.border = '1px solid #ddd';
+            
+            const img = document.createElement('img');
+            img.src = base64Image;
+            img.style.width = '100%';
+            img.style.height = '100%';
+            img.style.objectFit = 'contain';
+            
+            imgContainer.appendChild(img);
+            gallery.appendChild(imgContainer);
+          });
+          
+          tableContainer.appendChild(gallery);
+        } else {
+          tableContainer.innerHTML = '<div style="text-align: center; padding: 20px; color: red;">No se encontraron imágenes para esta temporada</div>';
+        }
+      })
+      .catch(error => {
+        console.error("Error al cargar imágenes:", error);
+        tableContainer.innerHTML = `<div style="text-align: center; padding: 20px; color: red;">Error al cargar imágenes: ${error.message}</div>`;
+      });
+    });
+*/
 
 function cargarResumenFormasPago() {
   const fechaInicio = document.getElementById("fecha-ventas").value;

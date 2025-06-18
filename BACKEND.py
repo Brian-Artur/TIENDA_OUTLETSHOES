@@ -19,8 +19,8 @@ app = Flask(__name__)
 DB_CONFIG = {
     "server": "localhost",
     "database": "CENTRALBREOGAN",
-    "username": "OUTLETSHOES",
-    "password": "OUTLETSHOES",
+    "username": "sa",
+    "password": "sqlserver",
     "driver": "{ODBC Driver 17 for SQL Server}",
 }
 
@@ -56,9 +56,9 @@ def get_connection():
         f"DRIVER={DB_CONFIG['driver']};"
         f"SERVER={DB_CONFIG['server']};"
         f"DATABASE={DB_CONFIG['database']};"
-        "Trusted_Connection=yes;"
-        # f"UID={DB_CONFIG['username']};"
-        # f"PWD={DB_CONFIG['password']}"
+        # "Trusted_Connection=yes;"
+        f"UID={DB_CONFIG['username']};"
+        f"PWD={DB_CONFIG['password']}"
     )
     return pyodbc.connect(conn_str)
 
@@ -1217,22 +1217,102 @@ def get_foto_articulo():
         return jsonify({"error": "Imagen no encontrada"}), 404, cors_headers()
 
 
-# Función para obtener imágenes por temporada
-def get_images_by_season(temporada):
+def get_articulos_by_season(temporada, offset):
     conn = get_connection()
     cursor = conn.cursor()
-    query = "SELECT FOTO FROM ARTICULOS WHERE TEMPORADA = ?"
+
+    query = """
+        SELECT 
+            CODARTICULO, 
+            DESCRIPCION, 
+            DESCRIPADIC, 
+            TEMPORADA, 
+            FOTO, 
+            MARCA 
+        FROM ARTICULOS 
+        WHERE TEMPORADA = ?
+        ORDER BY CODARTICULO
+        OFFSET ? ROWS FETCH NEXT 20 ROWS ONLY;
+    """
+
+    cursor.execute(query, (temporada, offset))
+    rows = cursor.fetchall()
+    conn.close()
+
+    articulos = []
+    for row in rows:
+        codarticulo, descripcion, descripadic, temporada, foto, marca = row
+
+        if foto:
+            imagen_base64 = base64.b64encode(foto).decode("utf-8")
+            foto_data = f"data:image/jpeg;base64,{imagen_base64}"
+        else:
+            foto_data = None
+
+        articulos.append(
+            {
+                "codarticulo": codarticulo,
+                "descripcion": descripcion,
+                "descripadic": descripadic,
+                "temporada": temporada,
+                "foto": foto_data,
+                "marca": marca,
+            }
+        )
+
+    return articulos
+
+
+'''
+# Función para obtener artículos con imagenes por temporada
+def get_articulos_by_season(temporada):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    query = """
+        SELECT 
+            CODARTICULO, 
+            DESCRIPCION, 
+            DESCRIPADIC, 
+            TEMPORADA, 
+            FOTO, 
+            MARCA 
+        FROM ARTICULOS 
+        WHERE TEMPORADA = ?
+        ORDER BY CODARTICULO
+        OFFSET 40 ROWS FETCH NEXT 20 ROWS ONLY;
+    """
+
     cursor.execute(query, (temporada,))
     rows = cursor.fetchall()
     conn.close()
 
-    imagenes = {}
-    for idx, row in enumerate(rows, start=1):
-        if row[0]:
-            imagen_base64 = base64.b64encode(row[0]).decode("utf-8")
-            imagenes[f"imagen_{idx}"] = f"data:image/jpeg;base64,{imagen_base64}"
+    articulos = []
+    for row in rows:
+        # Destructurar cada registro de la consulta
+        codarticulo, descripcion, descripadic, temporada, foto, marca = row
 
-    return imagenes
+        # Convertir la foto a base64 si existe, si no dejar como None
+        if foto:
+            imagen_base64 = base64.b64encode(foto).decode("utf-8")
+            foto_data = f"data:image/jpeg;base64,{imagen_base64}"
+        else:
+            foto_data = None  # Dejamos el hueco
+
+        articulo = {
+            "codarticulo": codarticulo,
+            "descripcion": descripcion,
+            "descripadic": descripadic,
+            "temporada": temporada,
+            "foto": foto_data,
+            "marca": marca,
+        }
+
+        articulos.append(articulo)
+
+    return articulos
+'''
+
 
 @app.route("/articulos-temporada", methods=["GET", "OPTIONS"])
 def get_articulos_por_temporada():
@@ -1241,28 +1321,63 @@ def get_articulos_por_temporada():
 
     try:
         temporada = request.args.get("temporada")
+        offset = int(request.args.get("offset", 0))  # por defecto empieza en 0
+
         if not temporada:
-            return jsonify({"error": "Falta el parámetro 'temporada'"}), 400, cors_headers()
+            return (
+                jsonify({"error": "Falta el parámetro 'temporada'"}),
+                400,
+                cors_headers(),
+            )
 
-        imagenes_dict = get_images_by_season(temporada)
-        if not imagenes_dict:
-            return jsonify({"error": "No se encontraron imágenes para esta temporada"}), 404, cors_headers()
+        articulos = get_articulos_by_season(temporada, offset)
 
-        # Devuelve las primeras 10 imágenes codificadas
-        primeras_10 = list(imagenes_dict.values())[:4]
-
-        return jsonify({"imagenes": primeras_10}), 200, cors_headers()
+        return jsonify({"articulos": articulos}), 200, cors_headers()
 
     except Exception as e:
         print(f"❌ Error en /articulos-temporada: {str(e)}")
         return (
-            jsonify({
-                "message": "Error al obtener artículos por temporada",
-                "error": str(e)
-            }),
+            jsonify({"message": "Error al obtener artículos", "error": str(e)}),
             500,
             cors_headers(),
         )
+
+
+"""
+@app.route("/articulos-temporada", methods=["GET", "OPTIONS"])
+def get_articulos_por_temporada():
+    if request.method == "OPTIONS":
+        return "", 200, cors_headers()
+
+    try:
+        temporada = request.args.get("temporada")
+        if not temporada:
+            return (
+                jsonify({"error": "Falta el parámetro 'temporada'"}),
+                400,
+                cors_headers(),
+            )
+
+        articulos = get_articulos_by_season(temporada)
+        if not articulos:
+            return (
+                jsonify({"error": "No se encontraron artículos para esta temporada"}),
+                404,
+                cors_headers(),
+            )
+
+        return jsonify({"articulos": articulos}), 200, cors_headers()
+
+    except Exception as e:
+        print(f"❌ Error en /articulos-temporada: {str(e)}")
+        return (
+            jsonify(
+                {"message": "Error al obtener artículos por temporada", "error": str(e)}
+            ),
+            500,
+            cors_headers(),
+        )
+"""
 
 
 @app.route("/formas-pago/resumen", methods=["GET", "OPTIONS"])
