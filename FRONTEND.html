@@ -1892,7 +1892,7 @@ async function mostrarFotosPorTemporada() {
     tableContainer.innerHTML = "Buscando artículos de la temporada...";
 
     try {
-        const response = await fetch(`https://abincodigital.loclx.io/articulos-temporada?temporada=${codigoTemporada}`);
+        const response = await fetch(`https://localhost:5000/articulos-temporada?temporada=${codigoTemporada}`);
         if (!response.ok) {
             throw new Error(`Error: ${response.statusText}`);
         }

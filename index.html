@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Imágenes por Temporada</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 2rem;
+    }
+    .image-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 1rem;
+    }
+    .image-container img {
+      width: 100%;
+      height: auto;
+      border: 2px solid #ccc;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Imágenes de la temporada V23</h1>
+  <div class="image-container" id="gallery"></div>
+
+  <script>
+    // Cambia aquí si necesitas otra temporada
+    const temporada = "V23";
+
+    fetch(`http://localhost:5000/articulos-temporada?temporada=${temporada}`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.imagenes && Array.isArray(data.imagenes)) {
+          const gallery = document.getElementById("gallery");
+
+          data.imagenes.forEach(base64Image => {
+            const img = document.createElement("img");
+            img.src = base64Image;
+            gallery.appendChild(img);
+          });
+        } else {
+          console.error("No se encontraron imágenes");
+        }
+      })
+      .catch(error => {
+        console.error("Error al cargar imágenes:", error);
+      });
+  </script>
+</body>
+</html>

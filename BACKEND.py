@@ -3,14 +3,24 @@ import pyodbc
 from datetime import datetime
 import io
 from flask import send_file
+import base64
+
 
 app = Flask(__name__)
 
+# DB_CONFIG = {
+#     "server": "SERVIDOR\\BREOGAN",
+#     "database": "CENTRALBREOGAN",
+#     "username": "sa",
+#     "password": "masterkey",
+#     "driver": "{ODBC Driver 17 for SQL Server}",
+# }
+
 DB_CONFIG = {
-    "server": "SERVIDOR\\BREOGAN",
+    "server": "localhost",
     "database": "CENTRALBREOGAN",
-    "username": "sa",
-    "password": "masterkey",
+    "username": "OUTLETSHOES",
+    "password": "OUTLETSHOES",
     "driver": "{ODBC Driver 17 for SQL Server}",
 }
 
@@ -18,7 +28,27 @@ DB_CONFIG = {
 # Ruta inicial porque me apetece
 @app.route("/")
 def home():
-    return "¡Bienvenido al backend!"
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        query = """
+        SELECT TOP (10) [DESCRIPCION]
+        FROM dbo.ARTICULOS
+        WHERE TEMPORADA = 'V24';
+        """
+        cursor.execute(query)
+
+        # Recoge los resultados en una lista
+        rows = cursor.fetchall()
+        fotos = [row[0] for row in rows]
+
+        cursor.close()
+        conn.close()
+
+        return jsonify({"fotos": fotos})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 def get_connection():
@@ -26,8 +56,9 @@ def get_connection():
         f"DRIVER={DB_CONFIG['driver']};"
         f"SERVER={DB_CONFIG['server']};"
         f"DATABASE={DB_CONFIG['database']};"
-        f"UID={DB_CONFIG['username']};"
-        f"PWD={DB_CONFIG['password']}"
+        "Trusted_Connection=yes;"
+        # f"UID={DB_CONFIG['username']};"
+        # f"PWD={DB_CONFIG['password']}"
     )
     return pyodbc.connect(conn_str)
 
@@ -1186,54 +1217,49 @@ def get_foto_articulo():
         return jsonify({"error": "Imagen no encontrada"}), 404, cors_headers()
 
 
+# Función para obtener imágenes por temporada
+def get_images_by_season(temporada):
+    conn = get_connection()
+    cursor = conn.cursor()
+    query = "SELECT FOTO FROM ARTICULOS WHERE TEMPORADA = ?"
+    cursor.execute(query, (temporada,))
+    rows = cursor.fetchall()
+    conn.close()
+
+    imagenes = {}
+    for idx, row in enumerate(rows, start=1):
+        if row[0]:
+            imagen_base64 = base64.b64encode(row[0]).decode("utf-8")
+            imagenes[f"imagen_{idx}"] = f"data:image/jpeg;base64,{imagen_base64}"
+
+    return imagenes
+
 @app.route("/articulos-temporada", methods=["GET", "OPTIONS"])
 def get_articulos_por_temporada():
     if request.method == "OPTIONS":
         return "", 200, cors_headers()
 
-    temporada = request.args.get("temporada")
-    if not temporada:
-        return jsonify({"error": "Falta el parámetro 'temporada'"}), 400, cors_headers()
-
-    query = """
-    SELECT 
-        A.REFPROVEEDOR AS REFERENCIA,
-        A.DESCRIPCION,
-        A.COLOR,
-        A.TEMPORADA,
-        CASE 
-            WHEN A.FOTO IS NOT NULL THEN CONCAT('data:image/jpeg;base64,', CAST('' AS XML).value('xs:base64Binary(sql:column("A.FOTO"))', 'VARCHAR(MAX)'))
-            ELSE NULL
-        END AS FOTO_URL
-    FROM ARTICULOS A
-    WHERE A.TEMPORADA = ?
-    ORDER BY A.REFPROVEEDOR
-    """
-
     try:
-        with get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(query, (temporada,))
-            columns = [col[0] for col in cursor.description]
-            data = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        temporada = request.args.get("temporada")
+        if not temporada:
+            return jsonify({"error": "Falta el parámetro 'temporada'"}), 400, cors_headers()
 
-        return (
-            jsonify(
-                {
-                    "message": f"Artículos de la temporada {temporada} obtenidos correctamente",
-                    "data": data,
-                }
-            ),
-            200,
-            cors_headers(),
-        )
+        imagenes_dict = get_images_by_season(temporada)
+        if not imagenes_dict:
+            return jsonify({"error": "No se encontraron imágenes para esta temporada"}), 404, cors_headers()
+
+        # Devuelve las primeras 10 imágenes codificadas
+        primeras_10 = list(imagenes_dict.values())[:4]
+
+        return jsonify({"imagenes": primeras_10}), 200, cors_headers()
 
     except Exception as e:
         print(f"❌ Error en /articulos-temporada: {str(e)}")
         return (
-            jsonify(
-                {"message": "Error al obtener artículos por temporada", "error": str(e)}
-            ),
+            jsonify({
+                "message": "Error al obtener artículos por temporada",
+                "error": str(e)
+            }),
             500,
             cors_headers(),
         )
