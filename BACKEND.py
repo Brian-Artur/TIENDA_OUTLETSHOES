@@ -1,17 +1,27 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 import pyodbc
 from datetime import datetime
 import io
 from flask import send_file
+import base64
 
 app = Flask(__name__)
 
-DB_CONFIG = {
+""" DB_CONFIG = {
     'server': 'SERVIDOR\\BREOGAN',
     'database': 'CENTRALBREOGAN',
     'username': 'sa',
     'password': 'masterkey',
     'driver': '{ODBC Driver 17 for SQL Server}'
+} """
+
+# Conectar a la base de datos local
+""" DB_CONFIG = {
+    'server': 'localhost',
+    'database': 'CENTRALBREOGAN',
+    'username': 'DESKTOP-LP5PVJ9\Victor',
+    'password': '1229',
+    'driver': '{ODBC Driver 17 for SQL Server}',
 }
 
 def get_connection():
@@ -21,8 +31,24 @@ def get_connection():
         f"DATABASE={DB_CONFIG['database']};"
         f"UID={DB_CONFIG['username']};"
         f"PWD={DB_CONFIG['password']}"
+        
+    )
+    return pyodbc.connect(conn_str) """
+DB_CONFIG = {
+    'server': 'localhost',
+    'database': 'CENTRALBREOGAN',
+    'driver': '{ODBC Driver 17 for SQL Server}',
+}
+
+def get_connection():
+    conn_str = (
+        f"DRIVER={DB_CONFIG['driver']};"
+        f"SERVER={DB_CONFIG['server']};"
+        f"DATABASE={DB_CONFIG['database']};"
+        f"Trusted_Connection=yes;"
     )
     return pyodbc.connect(conn_str)
+
 
 
 @app.route('/ventas', methods=['GET', 'OPTIONS'])
@@ -1084,6 +1110,83 @@ def get_foto_articulo():
     else:
         return jsonify({"error": "Imagen no encontrada"}), 404, cors_headers()
 
+# Mi codigo
+# Función para obtener imagen según temporada
+def get_image_by_season(referencia):
+    conn = get_connection()
+    cursor = conn.cursor()
+    query = """
+        SELECT TOP (4) FOTO FROM dbo.ARTICULOS WHERE TEMPORADA = ?
+        AND FOTO IS NOT NULL
+    """
+    cursor.execute(query, (referencia,))
+    rows = cursor.fetchall()
+
+    # lista para guardar las imagenes transformadas
+    imagenes = []
+    if rows:
+        for row in rows:
+            # Convertir la imagen a bytes
+            image_bytes = io.BytesIO(row[0])
+            # guardar la imagen
+            imagenes.append(image_bytes)
+            
+        return imagenes
+    else:
+        return None
+
+
+    """ if row:
+        return io.BytesIO(row[0])  # Devolvemos la imagen como un BytesIO
+    else:
+        return None """
+
+# Ruta para obtener catalago imagenes
+@app.route('/catalogo-temporada', methods=['GET', 'OPTIONS'])
+def get_catalogo_temporada():
+    if request.method == 'OPTIONS':
+        return '', 200, cors_headers()
+
+    """ referencia = request.args.get('referencia')
+    if not referencia:
+        return jsonify({"error": "Falta el código de 'temporada'"}), 400, cors_headers() """
+    
+    referencia = 'V22'
+    image_data = get_image_by_season(referencia)
+
+    if image_data:
+        data = []
+        for img in image_data:
+            img.seek(0)
+            encoded = base64.b64encode(img.read()).decode('utf-8')
+            data.append({'imagen': encoded})
+
+        return jsonify({
+            'message': f'{len(data)} imágenes encontradas',
+            'data': data
+        }), 200, cors_headers()
+    else:
+        return jsonify({"error": "Imagen no encontrada"}), 404, cors_headers()
+
+# ruta prueba index
+@app.route("/")
+def index():
+    temporada = 'V22'
+    imagenes = get_image_by_season(temporada)
+
+    if imagenes:
+        data = []
+        for img in imagenes:
+            img.seek(0)
+            encoded = base64.b64encode(img.read()).decode('utf-8')
+            data.append({'imagen': encoded})
+    else:
+        data = []
+
+    return render_template("indexPrueba.html", data=data)
+
+
+# Fin mi codigo    
 
 @app.route('/formas-pago/resumen', methods=['GET', 'OPTIONS'])
 def resumen_formas_pago():
