@@ -148,6 +148,7 @@ function exportarTablaAExcel() {
     link.click();
 }
 
+// Exporta datos a PDF usando jsPDF
 async function exportarTablaAPDF() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
@@ -310,7 +311,7 @@ async function exportarTablaAPDF() {
             }
         }
 
-        // Función para generar un informe
+        // Función para generar un reporte de existencias por proveedor
         async function generateReport() {
             try {
                 const proveedor = (prompt("Introduce los 3 caracteres identificativos del proveedor:") || "").trim().toUpperCase();
@@ -344,11 +345,11 @@ async function exportarTablaAPDF() {
 
         // Función para renderizar la tabla con múltiples registros
         function renderTable(data) {
-    document.getElementById("filtros-temporada").innerHTML = "";
-            if (!data || !Array.isArray(data)) {
-                tableContainer.innerHTML = '<p class="error">Invalid "data" field.</p>';
-                return;
-            }
+            document.getElementById("filtros-temporada").innerHTML = "";
+                if (!data || !Array.isArray(data)) {
+                    tableContainer.innerHTML = '<p class="error">Invalid "data" field.</p>';
+                    return;
+                }
 
             // Crear la tabla con encabezados fijos
             let tableHtml = `
@@ -393,30 +394,30 @@ async function exportarTablaAPDF() {
 
             // Agregar la tabla al contenedor
             let filtrosHtml = `
-    <strong>Filtrar por temporada:</strong>
-    <label><input type="checkbox" value="V25" onchange="filtrarPorTemporada()"> V25</label>
-    <label><input type="checkbox" value="V14" onchange="filtrarPorTemporada()"> V14</label>
-`;
-//document.getElementById("filtros-temporada").innerHTML = filtrosHtml;
-tableContainer.innerHTML = tableHtml;
+                <strong>Filtrar por temporada:</strong>
+                <label><input type="checkbox" value="V25" onchange="filtrarPorTemporada()"> V25</label>
+                <label><input type="checkbox" value="V14" onchange="filtrarPorTemporada()"> V14</label>
+            `;
+            //document.getElementById("filtros-temporada").innerHTML = filtrosHtml;
+            tableContainer.innerHTML = tableHtml;
 
-// Agregar evento de doble clic a cada referencia
-    const referenciaCells = document.querySelectorAll('.referencia-cell');
-    referenciaCells.forEach(cell => {
-        cell.addEventListener('dblclick', function() {
-            const referencia = this.getAttribute('data-referencia');
-            showArticuloImage(referencia);  // Llamar a la función para obtener la imagen
-        });
-    });
+            // Agregar evento de doble clic a cada referencia
+            const referenciaCells = document.querySelectorAll('.referencia-cell');
+            referenciaCells.forEach(cell => {
+                cell.addEventListener('dblclick', function() {
+                    const referencia = this.getAttribute('data-referencia');
+                    showArticuloImage(referencia);  // Llamar a la función para obtener la imagen
+                });
+            });
         }
 
-        // Función para renderizar la tabla de existencias
+        // No se utiliza este array
         let existenciasOriginales = [];
-
-function renderTableExistencias(data) {
-    setTimeout(() => {
-        generarCheckboxTemporadas();
-    }, 100);
+        // Muestra tabla de existencias
+        function renderTableExistencias(data) {
+            setTimeout(() => {
+                generarCheckboxTemporadas();
+            }, 100);
             if (!data || !Array.isArray(data)) {
                 tableContainer.innerHTML = '<p class="error">Invalid "data" field.</p>';
                 return;
@@ -538,15 +539,15 @@ function renderTableExistencias(data) {
 
             // Agregar la tabla al contenedor
             let filtrosHtml = `
-    <strong>Filtrar por temporada:</strong>
-    <label><input type="checkbox" value="V25" onchange="filtrarPorTemporada()"> V25</label>
-    <label><input type="checkbox" value="V14" onchange="filtrarPorTemporada()"> V14</label>
-`;
-document.getElementById("filtros-temporada").innerHTML = filtrosHtml;
-tableContainer.innerHTML = tableHtml;
-
+                <strong>Filtrar por temporada:</strong>
+                <label><input type="checkbox" value="V25" onchange="filtrarPorTemporada()"> V25</label>
+                <label><input type="checkbox" value="V14" onchange="filtrarPorTemporada()"> V14</label>
+            `;
+            document.getElementById("filtros-temporada").innerHTML = filtrosHtml;
+            tableContainer.innerHTML = tableHtml;
         }
 
+        // Muestra detalles de stock por referencia
         // Función para llamar a una API específica por fila
         async function showDetailsStocks(referencia, index) {
             const detailsRowId = `details-row-${index}`;
@@ -693,7 +694,7 @@ tableContainer.innerHTML = tableHtml;
             }
         }
 
-
+        // Muestra histórico de ventas por referencia 
         // Función para llamar a una API específica por fila
         async function showDetailsHistorico(referencia, index) {
             const detailsRowId = `details-historico-${index}`;
@@ -950,6 +951,7 @@ function generarCheckboxTemporadas() {
     filtrarPorTemporada();
 }
 
+// Exporta datos a CSV
 function exportarTablaAExcel() {
     const tabla = document.querySelector("#table-container table");
     if (!tabla) return alert("No hay tabla para exportar.");
