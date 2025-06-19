@@ -20,7 +20,7 @@ DB_CONFIG = {
     "server": "localhost",
     "database": "CENTRALBREOGAN",
     "username": "sa",
-    "password": "sqlserver",
+    "password": "963219",
     "driver": "{ODBC Driver 17 for SQL Server}",
 }
 
@@ -51,14 +51,20 @@ def home():
         return jsonify({"error": str(e)}), 500
 
 
+
+@app.route('/default-image')
+def default_image():
+    return send_file('public/articulo-sin-foto.png', mimetype='image/png')
+
+
 def get_connection():
     conn_str = (
         f"DRIVER={DB_CONFIG['driver']};"
         f"SERVER={DB_CONFIG['server']};"
         f"DATABASE={DB_CONFIG['database']};"
-        # "Trusted_Connection=yes;"
-        f"UID={DB_CONFIG['username']};"
-        f"PWD={DB_CONFIG['password']}"
+        "Trusted_Connection=yes;"
+        # f"UID={DB_CONFIG['username']};"
+        # f"PWD={DB_CONFIG['password']}"
     )
     return pyodbc.connect(conn_str)
 
@@ -1217,6 +1223,8 @@ def get_foto_articulo():
         return jsonify({"error": "Imagen no encontrada"}), 404, cors_headers()
 
 
+
+
 def get_articulos_by_season(temporada, offset):
     conn = get_connection()
     cursor = conn.cursor()
@@ -1243,11 +1251,15 @@ def get_articulos_by_season(temporada, offset):
     for row in rows:
         codarticulo, descripcion, descripadic, temporada, foto, marca = row
 
+        # Codifica la imagen
         if foto:
             imagen_base64 = base64.b64encode(foto).decode("utf-8")
             foto_data = f"data:image/jpeg;base64,{imagen_base64}"
         else:
             foto_data = None
+
+        # Consulta de stocks asociados
+        stocks = get_stocks_by_codarticulo(codarticulo)
 
         articulos.append(
             {
@@ -1257,61 +1269,14 @@ def get_articulos_by_season(temporada, offset):
                 "temporada": temporada,
                 "foto": foto_data,
                 "marca": marca,
+                "stocks": stocks 
             }
         )
 
     return articulos
 
 
-'''
-# Función para obtener artículos con imagenes por temporada
-def get_articulos_by_season(temporada):
-    conn = get_connection()
-    cursor = conn.cursor()
 
-    query = """
-        SELECT 
-            CODARTICULO, 
-            DESCRIPCION, 
-            DESCRIPADIC, 
-            TEMPORADA, 
-            FOTO, 
-            MARCA 
-        FROM ARTICULOS 
-        WHERE TEMPORADA = ?
-        ORDER BY CODARTICULO
-        OFFSET 40 ROWS FETCH NEXT 20 ROWS ONLY;
-    """
-
-    cursor.execute(query, (temporada,))
-    rows = cursor.fetchall()
-    conn.close()
-
-    articulos = []
-    for row in rows:
-        # Destructurar cada registro de la consulta
-        codarticulo, descripcion, descripadic, temporada, foto, marca = row
-
-        # Convertir la foto a base64 si existe, si no dejar como None
-        if foto:
-            imagen_base64 = base64.b64encode(foto).decode("utf-8")
-            foto_data = f"data:image/jpeg;base64,{imagen_base64}"
-        else:
-            foto_data = None  # Dejamos el hueco
-
-        articulo = {
-            "codarticulo": codarticulo,
-            "descripcion": descripcion,
-            "descripadic": descripadic,
-            "temporada": temporada,
-            "foto": foto_data,
-            "marca": marca,
-        }
-
-        articulos.append(articulo)
-
-    return articulos
-'''
 
 
 @app.route("/articulos-temporada", methods=["GET", "OPTIONS"])
@@ -1342,42 +1307,33 @@ def get_articulos_por_temporada():
             cors_headers(),
         )
 
+def get_stocks_by_codarticulo(codarticulo):
+    conn = get_connection()
+    cursor = conn.cursor()
 
-"""
-@app.route("/articulos-temporada", methods=["GET", "OPTIONS"])
-def get_articulos_por_temporada():
-    if request.method == "OPTIONS":
-        return "", 200, cors_headers()
+    query = """
+        SELECT 
+            TALLA,
+            CODALMACEN
+        FROM STOCKS
+        WHERE CODARTICULO = ? AND STOCK <> 0
+        ORDER BY TALLA, CODALMACEN;
+    """
 
-    try:
-        temporada = request.args.get("temporada")
-        if not temporada:
-            return (
-                jsonify({"error": "Falta el parámetro 'temporada'"}),
-                400,
-                cors_headers(),
-            )
+    cursor.execute(query, (codarticulo,))
+    rows = cursor.fetchall()
+    conn.close()
 
-        articulos = get_articulos_by_season(temporada)
-        if not articulos:
-            return (
-                jsonify({"error": "No se encontraron artículos para esta temporada"}),
-                404,
-                cors_headers(),
-            )
+    stocks = []
+    for row in rows:
+        talla, codalmacen = row
+        stocks.append({
+            "talla": talla,
+            "codalmacen": codalmacen
+        })
 
-        return jsonify({"articulos": articulos}), 200, cors_headers()
+    return stocks
 
-    except Exception as e:
-        print(f"❌ Error en /articulos-temporada: {str(e)}")
-        return (
-            jsonify(
-                {"message": "Error al obtener artículos por temporada", "error": str(e)}
-            ),
-            500,
-            cors_headers(),
-        )
-"""
 
 
 @app.route("/formas-pago/resumen", methods=["GET", "OPTIONS"])
