@@ -1846,6 +1846,7 @@ function showArticuloImage(referencia) {
 function showImageInModal(imageUrl) {
     // Crear un modal para mostrar la imagen
     const modal = document.createElement('div');
+
     modal.style.position = 'fixed';
     modal.style.top = '0';
     modal.style.left = '0';
@@ -1908,37 +1909,64 @@ async function exportGalleryToPDF() {
 
   await loadAllImages(gallery);
 
-    // Reemplaza todas las imágenes locales con sus versiones base64
-/*  const localImages = gallery.querySelectorAll('img[src*=".png"], img[src*=".jpg"]');
-  for (const img of localImages) {
-    const base64 = await getLocalImageAsBase64();
-    img.src = base64;
-  }
-*/
-
   html2canvas(gallery, {
     useCORS: true,
     allowTaint: false,
     logging: true,
-    scale: 2
+    scale: 1
   }).then(canvas => {
     const imgData = canvas.toDataURL('image/jpeg', 1.0);
     const pdf = new jspdf.jsPDF('p', 'mm', 'a4');
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
+    
+    // Definir márgenes
+    const marginHorizontal = 10; // 1cm = 10mm
+    const marginVertical = 20;   // 2cm = 20mm
+    
+    // Calcular área disponible para la imagen
+    const pageWidth = pdf.internal.pageSize.getWidth() - (2 * marginHorizontal);
+    const pageHeight = pdf.internal.pageSize.getHeight() - (2 * marginVertical);
 
     const imgProps = pdf.getImageProperties(imgData);
-    const pdfWidth = pageWidth;
-    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+    
+    // Calcular dimensiones manteniendo relación de aspecto
+    let pdfWidth = pageWidth;
+    let pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+    
+    // Si la imagen es más alta que el área disponible, ajustar
+    if (pdfHeight > pageHeight) {
+      pdfHeight = pageHeight;
+      pdfWidth = (imgProps.width * pdfHeight) / imgProps.height;
+    }
 
-    if (pdfHeight < pageHeight) {
-      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+    // Posición X centrada horizontalmente si la imagen es más estrecha que el área disponible
+    const xPos = marginHorizontal + (pageWidth - pdfWidth) / 2;
+    
+    // Posición Y centrada verticalmente si la imagen es más corta que el área disponible
+    const yPos = marginVertical + (pageHeight - pdfHeight) / 2;
+
+    if (pdfHeight <= pageHeight) {
+      // Si cabe en una sola página
+      pdf.addImage(imgData, 'JPEG', xPos, yPos, pdfWidth, pdfHeight);
     } else {
+      // Si requiere múltiples páginas (paginación vertical)
       let position = 0;
       while (position < pdfHeight) {
-        pdf.addImage(imgData, 'JPEG', 0, -position, pdfWidth, pdfHeight);
+        const remainingHeight = pdfHeight - position;
+        const displayHeight = Math.min(remainingHeight, pageHeight);
+        
+        pdf.addImage(
+          imgData, 
+          'JPEG', 
+          xPos, 
+          marginVertical - position, 
+          pdfWidth, 
+          pdfHeight
+        );
+        
         position += pageHeight;
-        if (position < pdfHeight) pdf.addPage();
+        if (position < pdfHeight) {
+          pdf.addPage();
+        }
       }
     }
 
@@ -2007,6 +2035,7 @@ function loadAllImages(container) {
             const { descripadic, foto, descripcion, stocks } = articulo;
 
             const card = document.createElement('div');
+            card.id  = 'id'             // ID de tarjeta
             card.style.width = '200px';
             card.style.border = '1px solid #ccc';
             card.style.borderRadius = '8px';
