@@ -249,7 +249,7 @@ async function exportarTablaAPDF() {
             <!-- Derecha -->
             <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 10px;">
                 <!-- Grupo de botones principales -->
-                <div class="button-group" style="display: flex; gap: 10px; justify-content: flex-end; width: 100%;">
+                <div id="button-group-top" class="button-group" style="display: flex; gap: 10px; justify-content: flex-end; width: 100%;">
                     <button id="btn-consulta" class="benefits-button" style="background-color: orange;">Consulta</button>
                     <button id="fetch-report" class="report-button">Existencias</button>
                     <button id="btn-historico" class="benefits-button">Histórico</button>
@@ -260,7 +260,7 @@ async function exportarTablaAPDF() {
                 </div>
 
                 <!-- Botones de exportación en una línea nueva -->
-                <div style="display: flex; justify-content: flex-end; gap: 10px; width: 100%;">
+                <div id="button-group-bot" style="display: flex; justify-content: flex-end; gap: 10px; width: 100%;">
                     <button onclick="imprimirTicket()">Imprimir Artículos Vendidos</button>
                     <button onclick="exportarTablaAExcel()">Exportar a Excel</button>
                     <button onclick="exportarTablaAPDF()">Exportar a PDF</button>
@@ -281,7 +281,9 @@ async function exportarTablaAPDF() {
         const specificApiUrlHistoricoStocks = "https://abincodigital.loclx.io/historico-stocks";
         const specificApiUrlConsulta = "https://abincodigital.loclx.io/consulta";
 
-        /**URL local ppara botón*/
+        /** 
+         * ! URL local ppara botón 
+        */
         const specificApiUrlFotosTemporada = "http://localhost:5000/articulos-temporada";
 
         // Elementos del DOM
@@ -1978,6 +1980,20 @@ async function exportGalleryToPDF() {
   });
 }
 
+          const groupBtnTop = document.getElementById("button-group-top")
+
+          // Crear botón para exportar   
+          const exportBtn = document.createElement('button');
+          exportBtn.textContent = 'Exportar a PDF';
+          exportBtn.className = 'btn btn-success fw-bold';
+          exportBtn.style.marginTop = '20px';
+          exportBtn.style.backgroundColor = '#b53c6e';
+          exportBtn.style.display = 'block';
+          exportBtn.style.marginInline = 'auto';
+          exportBtn.addEventListener('click', exportGalleryToPDF);
+          groupBtnTop.appendChild(exportBtn);
+
+
 
 // Función auxiliar para asegurar carga de imágenes
 function loadAllImages(container) {
@@ -2083,46 +2099,8 @@ function loadAllImages(container) {
             gallery.appendChild(card);
           });
 
-          // Crear botón para exportar   
-          const exportBtn = document.createElement('button');
-          exportBtn.textContent = 'Exportar a PDF';
-          exportBtn.className = 'btn btn-success fw-bold';
-          exportBtn.style.marginTop = '20px';
-          exportBtn.style.display = 'block';
-          exportBtn.style.marginInline = 'auto';
-          exportBtn.addEventListener('click', exportGalleryToPDF);
 
-          
           tableContainer.appendChild(gallery);
-          tableContainer.appendChild(exportBtn);
-
-          // Botonera de paginación
-          const controls = document.createElement('div');
-          controls.style.textAlign = 'center';
-          controls.style.marginTop = '20px';
-
-          const prevBtn = document.createElement('button');
-          prevBtn.textContent = '← Anterior';
-          prevBtn.disabled = offsetActual === 0;
-          prevBtn.style.margin = '0 10px';
-          prevBtn.onclick = () => {
-            offset -= limit;
-            if (offset < 0) offset = 0;
-            cargarPagina(offset);
-          };
-
-          const nextBtn = document.createElement('button');
-          nextBtn.textContent = 'Siguiente →';
-          nextBtn.disabled = data.articulos.length < limit;
-          nextBtn.style.margin = '0 10px';
-          nextBtn.onclick = () => {
-            offset += limit;
-            cargarPagina(offset);
-          };
-
-          controls.appendChild(prevBtn);
-          controls.appendChild(nextBtn);
-          tableContainer.appendChild(controls);
 
         } else {
           tableContainer.innerHTML = '<div style="text-align: center; padding: 20px; color: red;">No se encontraron artículos para esta temporada</div>';

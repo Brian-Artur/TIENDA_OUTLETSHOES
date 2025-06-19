@@ -8,7 +8,7 @@ import base64
 
 app = Flask(__name__)
 
-CORS(app) 
+CORS(app)
 
 # DB_CONFIG = {
 #     "server": "SERVIDOR\\BREOGAN",
@@ -53,13 +53,13 @@ def home():
         return jsonify({"error": str(e)}), 500
 
 
-
-@app.route('/default-image')
+@app.route("/default-image")
 def default_image():
     try:
-        return send_file('public/articulo-sin-foto.jpg', mimetype='image/jpg')
+        return send_file("public/articulo-sin-foto.jpg", mimetype="image/jpg")
     except Exception as e:
-            return str(e), 404
+        return str(e), 404
+
 
 def get_connection():
     conn_str = (
@@ -1227,9 +1227,7 @@ def get_foto_articulo():
         return jsonify({"error": "Imagen no encontrada"}), 404, cors_headers()
 
 
-
-
-def get_articulos_by_season(temporada, offset):
+def get_articulos_by_season(temporada):
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -1243,11 +1241,10 @@ def get_articulos_by_season(temporada, offset):
             MARCA 
         FROM ARTICULOS 
         WHERE TEMPORADA = ?
-        ORDER BY CODARTICULO
-        OFFSET ? ROWS FETCH NEXT 20 ROWS ONLY;
+        ORDER BY CODARTICULO;
     """
 
-    cursor.execute(query, (temporada, offset))
+    cursor.execute(query, (temporada))
     rows = cursor.fetchall()
     conn.close()
 
@@ -1273,14 +1270,11 @@ def get_articulos_by_season(temporada, offset):
                 "temporada": temporada,
                 "foto": foto_data,
                 "marca": marca,
-                "stocks": stocks 
+                "stocks": stocks,
             }
         )
 
     return articulos
-
-
-
 
 
 @app.route("/articulos-temporada", methods=["GET", "OPTIONS"])
@@ -1299,7 +1293,7 @@ def get_articulos_por_temporada():
                 cors_headers(),
             )
 
-        articulos = get_articulos_by_season(temporada, offset)
+        articulos = get_articulos_by_season(temporada)
 
         return jsonify({"articulos": articulos}), 200, cors_headers()
 
@@ -1310,6 +1304,7 @@ def get_articulos_por_temporada():
             500,
             cors_headers(),
         )
+
 
 def get_stocks_by_codarticulo(codarticulo):
     conn = get_connection()
@@ -1331,13 +1326,9 @@ def get_stocks_by_codarticulo(codarticulo):
     stocks = []
     for row in rows:
         talla, codalmacen = row
-        stocks.append({
-            "talla": talla,
-            "codalmacen": codalmacen
-        })
+        stocks.append({"talla": talla, "codalmacen": codalmacen})
 
     return stocks
-
 
 
 @app.route("/formas-pago/resumen", methods=["GET", "OPTIONS"])

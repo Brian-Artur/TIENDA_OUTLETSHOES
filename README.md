@@ -1,20 +1,15 @@
 # Procedimiento
 
-1. Crear entorno virtual:
+1. Entorno virtual:
 
 ```bash
 python -m venv .venv
-
 source .venv/Scripts/activate
-
-pip install flask
-
-pip install pyodbc
-
+pip install
 pip freeze > requirements.txt
 ```
 
-2. Ejecutar tu backend dentro del entorno
+2. Ejecutar tu backend
 
 ```bash
 python BACKEND.py
