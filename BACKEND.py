@@ -1,12 +1,14 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 import pyodbc
 from datetime import datetime
 import io
-from flask import send_file
+from flask_cors import CORS
 import base64
 
 
 app = Flask(__name__)
+
+CORS(app) 
 
 # DB_CONFIG = {
 #     "server": "SERVIDOR\\BREOGAN",
@@ -54,8 +56,10 @@ def home():
 
 @app.route('/default-image')
 def default_image():
-    return send_file('public/articulo-sin-foto.png', mimetype='image/png')
-
+    try:
+        return send_file('public/articulo-sin-foto.jpg', mimetype='image/jpg')
+    except Exception as e:
+            return str(e), 404
 
 def get_connection():
     conn_str = (

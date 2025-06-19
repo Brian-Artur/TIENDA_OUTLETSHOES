@@ -1906,18 +1906,21 @@ async function exportGalleryToPDF() {
   const gallery = document.getElementById('gallery');
   if (!gallery) return alert('No hay galería para exportar');
 
+  await loadAllImages(gallery);
+
     // Reemplaza todas las imágenes locales con sus versiones base64
-  const localImages = gallery.querySelectorAll('img[src*=".png"], img[src*=".jpg"]');
+/*  const localImages = gallery.querySelectorAll('img[src*=".png"], img[src*=".jpg"]');
   for (const img of localImages) {
     const base64 = await getLocalImageAsBase64();
     img.src = base64;
   }
+*/
 
   html2canvas(gallery, {
     useCORS: true,
-    allowTaint: true,
+    allowTaint: false,
     logging: true,
-    scale: 1
+    scale: 2
   }).then(canvas => {
     const imgData = canvas.toDataURL('image/jpeg', 1.0);
     const pdf = new jspdf.jsPDF('p', 'mm', 'a4');
@@ -1941,9 +1944,29 @@ async function exportGalleryToPDF() {
 
     const fecha = new Date().toISOString().slice(0, 10);
     pdf.save(`articulos-${fecha}.pdf`);
+  }).catch(error => {
+    console.error('Error al generar PDF:', error);
+    alert('Error al generar PDF: ' + error.message);
   });
 }
 
+
+// Función auxiliar para asegurar carga de imágenes
+function loadAllImages(container) {
+  const images = container.getElementsByTagName('img');
+  const promises = [];
+  
+  for (const img of images) {
+    if (!img.complete || img.naturalHeight === 0) {
+      promises.push(new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = () => reject(new Error(`Error cargando imagen: ${img.src}`));
+      }));
+    }
+  }
+  
+  return Promise.all(promises);
+}
 
 
         // Obtén referencia al botón de fotos temporada
