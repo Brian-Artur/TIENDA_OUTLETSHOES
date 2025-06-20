@@ -1,7 +1,8 @@
-from flask import Flask, request, jsonify, render_template, send_file
+from flask import Flask, request, jsonify, render_template
 import pyodbc
 from datetime import datetime
 import io
+from flask import send_file
 from flask_cors import CORS
 import os
 
@@ -12,10 +13,10 @@ app = Flask(__name__)
 # mi codigo
 CORS(app)  # Esto permite CORS en todas las rutas
 
-
 @app.route("/imagen-generica")
 def imagen_generica():
-    ruta = os.path.join(os.path.dirname(__file__), "img", "articulo-sin-foto.jpg")
+    # ruta = os.path.join(os.path.dirname(__file__), "img", "articulo-sin-foto.png")
+    ruta = os.path.join(os.path.dirname(__file__), "img", "foto.jpg")
     return send_file(ruta, mimetype="image/jpg")
 
 
@@ -28,12 +29,29 @@ def imagen_generica():
 } """
 
 # Conectar a la base de datos local
-DB_CONFIG = {
-    "server": "localhost",
-    "database": "CENTRALBREOGAN",
-    "driver": "{ODBC Driver 17 for SQL Server}",
+""" DB_CONFIG = {
+    'server': 'localhost',
+    'database': 'CENTRALBREOGAN',
+    'username': 'DESKTOP-LP5PVJ9\Victor',
+    'password': '1229',
+    'driver': '{ODBC Driver 17 for SQL Server}',
 }
 
+def get_connection():
+    conn_str = (
+        f"DRIVER={DB_CONFIG['driver']};"
+        f"SERVER={DB_CONFIG['server']};"
+        f"DATABASE={DB_CONFIG['database']};"
+        f"UID={DB_CONFIG['username']};"
+        f"PWD={DB_CONFIG['password']}"
+        
+    )
+    return pyodbc.connect(conn_str) """
+DB_CONFIG = {
+    'server': 'localhost',
+    'database': 'CENTRALBREOGAN',
+    'driver': '{ODBC Driver 17 for SQL Server}',
+}
 
 def get_connection():
     conn_str = (
@@ -45,33 +63,26 @@ def get_connection():
     return pyodbc.connect(conn_str)
 
 
-@app.route("/ventas", methods=["GET", "OPTIONS"])
-def get_ventas():
-    if request.method == "OPTIONS":
-        return ("", 200, cors_headers())
 
-    tienda = request.args.get("tienda")
-    fechaini = request.args.get("fechaini")
-    fechafin = request.args.get("fechafin")
+@app.route('/ventas', methods=['GET', 'OPTIONS'])
+def get_ventas():
+    if request.method == 'OPTIONS':
+        return ('', 200, cors_headers())
+
+    tienda = request.args.get('tienda')
+    fechaini = request.args.get('fechaini')
+    fechafin = request.args.get('fechafin')
 
     if not all([tienda, fechaini, fechafin]):
-        return (
-            jsonify({"error": "Faltan parámetros: tienda, fechaini o fechafin"}),
-            400,
-            cors_headers(),
-        )
+        return jsonify({"error": "Faltan parámetros: tienda, fechaini o fechafin"}), 400, cors_headers()
 
     try:
         fechaini_dt = datetime.strptime(fechaini, "%Y-%m-%d")
         fechafin_dt = datetime.strptime(fechafin, "%Y-%m-%d")
     except ValueError:
-        return (
-            jsonify({"error": "Formato de fecha inválido. Usa YYYY-MM-DD"}),
-            400,
-            cors_headers(),
-        )
-
-    if tienda != "T0":
+        return jsonify({"error": "Formato de fecha inválido. Usa YYYY-MM-DD"}), 400, cors_headers()
+    
+    if tienda != 'T0':
         query = """
         SELECT 
             ALBVENTALIN.REFERENCIA, 
@@ -90,30 +101,23 @@ def get_ventas():
         GROUP BY 
             ALBVENTALIN.REFERENCIA, DESCRIPCION, TALLA, COLOR, PRECIOIVA
     """
-
+        
         try:
             with get_connection() as conn:
                 with conn.cursor() as cursor:
                     cursor.execute(query, (fechaini_dt, fechafin_dt, tienda))
                     columns = [col[0] for col in cursor.description]
                     data = [dict(zip(columns, row)) for row in cursor.fetchall()]
-            return (
-                jsonify({"message": "Consulta ejecutada correctamente", "data": data}),
-                200,
-                cors_headers(),
-            )
+            return jsonify({
+                "message": "Consulta ejecutada correctamente",
+                "data": data
+            }), 200, cors_headers()
 
         except Exception as e:
-            return (
-                jsonify(
-                    {
-                        "message": "Ocurrió un error durante la ejecución",
-                        "error": str(e),
-                    }
-                ),
-                500,
-                cors_headers(),
-            )
+            return jsonify({
+                "message": "Ocurrió un error durante la ejecución",
+                "error": str(e)
+            }), 500, cors_headers()
 
     else:
         query = """
@@ -142,37 +146,26 @@ def get_ventas():
                     cursor.execute(query, (fechaini_dt, fechafin_dt))
                     columns = [col[0] for col in cursor.description]
                     data = [dict(zip(columns, row)) for row in cursor.fetchall()]
-            return (
-                jsonify({"message": "Consulta ejecutada correctamente", "data": data}),
-                200,
-                cors_headers(),
-            )
+            return jsonify({
+                "message": "Consulta ejecutada correctamente",
+                "data": data
+            }), 200, cors_headers()
 
         except Exception as e:
-            return (
-                jsonify(
-                    {
-                        "message": "Ocurrió un error durante la ejecución",
-                        "error": str(e),
-                    }
-                ),
-                500,
-                cors_headers(),
-            )
+            return jsonify({
+                "message": "Ocurrió un error durante la ejecución",
+                "error": str(e)
+            }), 500, cors_headers()
 
 
-@app.route("/stock", methods=["GET", "OPTIONS"])
+@app.route('/stock', methods=['GET', 'OPTIONS'])
 def get_stock():
-    if request.method == "OPTIONS":
-        return "", 200, cors_headers()
+    if request.method == 'OPTIONS':
+        return '', 200, cors_headers()
 
-    referencia = request.args.get("referencia")
+    referencia = request.args.get('referencia')
     if not referencia:
-        return (
-            jsonify({"error": "Falta el parámetro 'referencia'"}),
-            400,
-            cors_headers(),
-        )
+        return jsonify({"error": "Falta el parámetro 'referencia'"}), 400, cors_headers()
 
     query = """
         SELECT 
@@ -230,34 +223,28 @@ def get_stock():
             rows = cursor.fetchall()
             data = [dict(zip(columns, row)) for row in rows]
 
-        return (
-            jsonify({"message": "Consulta de stock realizada", "data_detail": data}),
-            200,
-            cors_headers(),
-        )
+        return jsonify({
+            "message": "Consulta de stock realizada",
+            "data_detail": data
+        }), 200, cors_headers()
 
     except Exception as e:
-        return (
-            jsonify({"message": "Error durante la consulta", "error": str(e)}),
-            500,
-            cors_headers(),
-        )
+        return jsonify({
+            "message": "Error durante la consulta",
+            "error": str(e)
+        }), 500, cors_headers()
 
 
-@app.route("/historico", methods=["GET", "OPTIONS"])
+@app.route('/historico', methods=['GET', 'OPTIONS'])
 def historico():
     print("📡 Recibida petición a /historico")
+    
+    if request.method == 'OPTIONS':
+        return ('', 200, cors_headers())
 
-    if request.method == "OPTIONS":
-        return ("", 200, cors_headers())
-
-    referencia = request.args.get("referencia")
+    referencia = request.args.get('referencia')
     if not referencia:
-        return (
-            jsonify({"message": "El parámetro 'referencia' es obligatorio"}),
-            400,
-            cors_headers(),
-        )
+        return jsonify({"message": "El parámetro 'referencia' es obligatorio"}), 400, cors_headers()
 
     query = """
         SELECT 
@@ -314,40 +301,27 @@ def historico():
             columns = [column[0] for column in cursor.description]
             data_detail = [dict(zip(columns, row)) for row in rows]
 
-        return (
-            jsonify(
-                {
-                    "message": "Consulta ejecutada correctamente",
-                    "data_detail": data_detail,
-                }
-            ),
-            200,
-            cors_headers(),
-        )
+        return jsonify({
+            "message": "Consulta ejecutada correctamente",
+            "data_detail": data_detail
+        }), 200, cors_headers()
 
     except Exception as e:
         print("❌ Error:", str(e))
-        return (
-            jsonify(
-                {"message": "Ocurrió un error durante la ejecución", "error": str(e)}
-            ),
-            500,
-            cors_headers(),
-        )
+        return jsonify({
+            "message": "Ocurrió un error durante la ejecución",
+            "error": str(e)
+        }), 500, cors_headers()
 
 
-@app.route("/existencias", methods=["GET", "OPTIONS"])
+@app.route('/existencias', methods=['GET', 'OPTIONS'])
 def get_existencias():
-    if request.method == "OPTIONS":
-        return "", 200, cors_headers()
+    if request.method == 'OPTIONS':
+        return '', 200, cors_headers()
 
-    proveedor = request.args.get("proveedor")
+    proveedor = request.args.get('proveedor')
     if not proveedor:
-        return (
-            jsonify({"message": "Falta el parámetro 'proveedor'"}),
-            400,
-            cors_headers(),
-        )
+        return jsonify({"message": "Falta el parámetro 'proveedor'"}), 400, cors_headers()
 
     query = """
         SELECT 
@@ -412,36 +386,30 @@ def get_existencias():
                 columns = [col[0] for col in cursor.description]
                 data = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
-        return (
-            jsonify({"message": "Consulta de existencias ejecutada", "data": data}),
-            200,
-            cors_headers(),
-        )
+        return jsonify({
+            "message": "Consulta de existencias ejecutada",
+            "data": data
+        }), 200, cors_headers()
 
     except Exception as e:
         traceback.print_exc()
-        return (
-            jsonify({"message": "Error al obtener existencias", "error": str(e)}),
-            500,
-            cors_headers(),
-        )
+        return jsonify({
+            "message": "Error al obtener existencias",
+            "error": str(e)
+        }), 500, cors_headers()
 
 
-@app.route("/cuadrobeneficios", methods=["GET", "OPTIONS"])
+@app.route('/cuadrobeneficios', methods=['GET', 'OPTIONS'])
 def cuadro_beneficios():
-    if request.method == "OPTIONS":
-        return "", 200, cors_headers()
+    if request.method == 'OPTIONS':
+        return '', 200, cors_headers()
 
-    fechaini = request.args.get("fechaini")
-    fechafin = request.args.get("fechafin")
-    temporadas = request.args.get("temporadas")  # puede ser None o tipo 'V25,V14'
+    fechaini = request.args.get('fechaini')
+    fechafin = request.args.get('fechafin')
+    temporadas = request.args.get('temporadas')  # puede ser None o tipo 'V25,V14'
 
     if not fechaini or not fechafin:
-        return (
-            jsonify({"error": "Faltan los parámetros 'fechaini' y/o 'fechafin'"}),
-            400,
-            cors_headers(),
-        )
+        return jsonify({"error": "Faltan los parámetros 'fechaini' y/o 'fechafin'"}), 400, cors_headers()
 
     query = """
     SELECT 
@@ -579,33 +547,27 @@ ORDER BY PROVEEDOR;
             columns = [col[0] for col in cursor.description]
             data = [dict(zip(columns, row)) for row in rows]
 
-        return (
-            jsonify({"message": "Consulta ejecutada correctamente", "data": data}),
-            200,
-            cors_headers(),
-        )
+        return jsonify({
+            "message": "Consulta ejecutada correctamente",
+            "data": data
+        }), 200, cors_headers()
 
     except Exception as e:
         print("❌ Error en /beneficios:", str(e))
-        return (
-            jsonify({"message": "Error al ejecutar la consulta", "error": str(e)}),
-            500,
-            cors_headers(),
-        )
+        return jsonify({
+            "message": "Error al ejecutar la consulta",
+            "error": str(e)
+        }), 500, cors_headers()
 
 
-@app.route("/historico-stocks", methods=["GET", "OPTIONS"])
+@app.route('/historico-stocks', methods=['GET', 'OPTIONS'])
 def historico_stocks():
-    if request.method == "OPTIONS":
-        return "", 200, cors_headers()
+    if request.method == 'OPTIONS':
+        return '', 200, cors_headers()
 
-    referencia = request.args.get("referencia")
+    referencia = request.args.get('referencia')
     if not referencia:
-        return (
-            jsonify({"error": "Falta el parámetro 'referencia'"}),
-            400,
-            cors_headers(),
-        )
+        return jsonify({"error": "Falta el parámetro 'referencia'"}), 400, cors_headers()
 
     # Escapamos comillas simples por seguridad
     referencia_sql = referencia.replace("'", "''")
@@ -731,43 +693,35 @@ def historico_stocks():
             rows = cursor.fetchall()
             data = [dict(zip(columns, row)) for row in rows]
 
-        return (
-            jsonify(
-                {"message": "Histórico de stock obtenido correctamente", "data": data}
-            ),
-            200,
-            cors_headers(),
-        )
+        return jsonify({
+            "message": "Histórico de stock obtenido correctamente",
+            "data": data
+        }), 200, cors_headers()
 
     except Exception as e:
         print("❌ Error en /historico-stock:", str(e))
-        return (
-            jsonify({"message": "Error al ejecutar la consulta", "error": str(e)}),
-            500,
-            cors_headers(),
-        )
+        return jsonify({
+            "message": "Error al ejecutar la consulta",
+            "error": str(e)
+        }), 500, cors_headers()
 
 
-@app.route("/consulta", methods=["GET", "OPTIONS"])
+
+@app.route('/consulta', methods=['GET', 'OPTIONS'])
 def consulta_general():
-    if request.method == "OPTIONS":
-        return "", 200, cors_headers()
+    if request.method == 'OPTIONS':
+        return '', 200, cors_headers()
 
-    referencia = request.args.get("referencia")
+    referencia = request.args.get('referencia')
     if not referencia:
-        return (
-            jsonify({"error": "Falta el parámetro 'referencia'"}),
-            400,
-            cors_headers(),
-        )
+        return jsonify({"error": "Falta el parámetro 'referencia'"}), 400, cors_headers()
 
     try:
         with get_connection() as conn:
             cursor = conn.cursor()
 
             # Obtener STOCK
-            cursor.execute(
-                """
+            cursor.execute("""
             -- Paso 1: Recibes un único parámetro
 DECLARE @parametro NVARCHAR(50) = ?;  -- Puede ser REFPROVEEDOR o CODBARRAS
 DECLARE @codArticulo NVARCHAR(50); -- Este es el artículo completo (no la talla específica)
@@ -830,15 +784,12 @@ WHERE S.CODARTICULO = @codArticulo
 GROUP BY 
     ALM.CODALMACEN, ALM.NOMBREALMACEN, A.REFPROVEEDOR, A.DESCRIPCION
 ORDER BY REFERENCIA;
-            """,
-                (referencia),
-            )
+            """, (referencia))
             stock_columns = [col[0] for col in cursor.description]
             stock_data = [dict(zip(stock_columns, row)) for row in cursor.fetchall()]
 
             # Obtener HISTÓRICO
-            cursor.execute(
-                """
+            cursor.execute("""
             -- 1. Recibe un único parámetro
 DECLARE @parametro NVARCHAR(50) = ?;  -- Puede ser REFPROVEEDOR o CODBARRAS
 DECLARE @codArticulo NVARCHAR(50);
@@ -902,45 +853,31 @@ GROUP BY
     ALM.CODALMACEN, ALM.NOMBREALMACEN, A.REFPROVEEDOR, A.DESCRIPCION
 ORDER BY A.REFPROVEEDOR;
 
-            """,
-                (referencia,),
-            )
+            """, (referencia,))
             historico_columns = [col[0] for col in cursor.description]
-            historico_data = [
-                dict(zip(historico_columns, row)) for row in cursor.fetchall()
-            ]
+            historico_data = [dict(zip(historico_columns, row)) for row in cursor.fetchall()]
 
-        return (
-            jsonify(
-                {
-                    "message": "Consulta combinada completada",
-                    "stock": stock_data,
-                    "historico": historico_data,
-                }
-            ),
-            200,
-            cors_headers(),
-        )
+        return jsonify({
+            "message": "Consulta combinada completada",
+            "stock": stock_data,
+            "historico": historico_data
+        }), 200, cors_headers()
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500, cors_headers()
 
 
-@app.route("/cuadrobeneficiostemporadas", methods=["GET", "OPTIONS"])
+@app.route('/cuadrobeneficiostemporadas', methods=['GET', 'OPTIONS'])
 def cuadro_beneficios_temporadas():
-    if request.method == "OPTIONS":
-        return "", 200, cors_headers()
+    if request.method == 'OPTIONS':
+        return '', 200, cors_headers()
 
-    fechaini = request.args.get("fechaini")
-    fechafin = request.args.get("fechafin")
-    temporadas = request.args.get("temporadas")  # puede ser None o tipo 'V25,V14'
+    fechaini = request.args.get('fechaini')
+    fechafin = request.args.get('fechafin')
+    temporadas = request.args.get('temporadas')  # puede ser None o tipo 'V25,V14'
 
     if not fechaini or not fechafin:
-        return (
-            jsonify({"error": "Faltan los parámetros 'fechaini' y/o 'fechafin'"}),
-            400,
-            cors_headers(),
-        )
+        return jsonify({"error": "Faltan los parámetros 'fechaini' y/o 'fechafin'"}), 400, cors_headers()
 
     query = """
     SELECT 
@@ -1058,35 +995,29 @@ ORDER BY TEMPORADA;
             columns = [col[0] for col in cursor.description]
             data = [dict(zip(columns, row)) for row in rows]
 
-        return (
-            jsonify({"message": "Consulta ejecutada correctamente", "data": data}),
-            200,
-            cors_headers(),
-        )
+        return jsonify({
+            "message": "Consulta ejecutada correctamente",
+            "data": data
+        }), 200, cors_headers()
 
     except Exception as e:
         print("❌ Error en /beneficios:", str(e))
-        return (
-            jsonify({"message": "Error al ejecutar la consulta", "error": str(e)}),
-            500,
-            cors_headers(),
-        )
+        return jsonify({
+            "message": "Error al ejecutar la consulta",
+            "error": str(e)
+        }), 500, cors_headers()
 
 
-@app.route("/cierresdecaja", methods=["GET", "OPTIONS"])
+@app.route('/cierresdecaja', methods=['GET', 'OPTIONS'])
 def cierresdecaja():
-    if request.method == "OPTIONS":
-        return "", 200, cors_headers()
+    if request.method == 'OPTIONS':
+        return '', 200, cors_headers()
 
-    fechaini = request.args.get("fechaini")
-    fechafin = request.args.get("fechafin")
+    fechaini = request.args.get('fechaini')
+    fechafin = request.args.get('fechafin')
 
     if not fechaini or not fechafin:
-        return (
-            jsonify({"error": "Faltan los parámetros 'fechaini' y/o 'fechafin'"}),
-            400,
-            cors_headers(),
-        )
+        return jsonify({"error": "Faltan los parámetros 'fechaini' y/o 'fechafin'"}), 400, cors_headers()
 
     query = """
     SELECT 
@@ -1142,19 +1073,17 @@ ORDER BY AR.FECHA;
             columns = [col[0] for col in cursor.description]
             data = [dict(zip(columns, row)) for row in rows]
 
-        return (
-            jsonify({"message": "Consulta ejecutada correctamente", "data": data}),
-            200,
-            cors_headers(),
-        )
+        return jsonify({
+            "message": "Consulta ejecutada correctamente",
+            "data": data
+        }), 200, cors_headers()
 
     except Exception as e:
         print("❌ Error en /cierresdecaja:", str(e))
-        return (
-            jsonify({"message": "Error al ejecutar la consulta", "error": str(e)}),
-            500,
-            cors_headers(),
-        )
+        return jsonify({
+            "message": "Error al ejecutar la consulta",
+            "error": str(e)
+        }), 500, cors_headers()
 
 
 # Función para obtener la imagen de la base de datos
@@ -1166,7 +1095,7 @@ def get_image_by_reference(referencia):
     """
     cursor.execute(query, (referencia,))
     row = cursor.fetchone()
-
+    
     if row:
         return io.BytesIO(row[0])  # Devolvemos la imagen como un BytesIO
     else:
@@ -1174,30 +1103,25 @@ def get_image_by_reference(referencia):
 
 
 # Nueva ruta para obtener la foto del artículo
-@app.route("/articulo/foto", methods=["GET", "OPTIONS"])
+@app.route('/articulo/foto', methods=['GET', 'OPTIONS'])
 def get_foto_articulo():
-    if request.method == "OPTIONS":
-        return "", 200, cors_headers()
+    if request.method == 'OPTIONS':
+        return '', 200, cors_headers()
 
-    referencia = request.args.get("referencia")
+    referencia = request.args.get('referencia')
     if not referencia:
-        return (
-            jsonify({"error": "Falta el parámetro 'referencia'"}),
-            400,
-            cors_headers(),
-        )
+        return jsonify({"error": "Falta el parámetro 'referencia'"}), 400, cors_headers()
 
     image_data = get_image_by_reference(referencia)
 
     if image_data:
-        response = send_file(image_data, mimetype="image/jpeg")
+        response = send_file(image_data, mimetype='image/jpeg')
         # Agregar cabeceras CORS manualmente
         for key, value in cors_headers().items():
             response.headers[key] = value
         return response
     else:
         return jsonify({"error": "Imagen no encontrada"}), 404, cors_headers()
-
 
 # Mi codigo
 # Función para obtener imagen según temporada
@@ -1224,94 +1148,76 @@ def get_image_by_season(referencia):
     if rows:
         for cod, desc, descadic, foto, talla, stock in rows:
             # Convertimos FOTO (bytes) a base64
-            foto_b64 = base64.b64encode(foto).decode("utf-8") if foto else None
-            imagenes.append(
-                {
-                    "codarticulo": cod,
-                    "descripcion": desc,
-                    "descripcionadic": descadic,
-                    "foto": foto_b64,
-                    "talla": talla,
-                    "stock": stock,
-                }
-            )
-
+            foto_b64 = base64.b64encode(foto).decode('utf-8') if foto else None
+            imagenes.append({
+                'codarticulo': cod,
+                'descripcion': desc,
+                'descripcionadic': descadic,
+                'foto': foto_b64,
+                'talla': talla,
+                'stock': stock
+            })
+            
         return imagenes
 
 
 # Ruta para obtener catalago imagenes
-@app.route("/catalogo-temporada", methods=["GET", "OPTIONS"])
+@app.route('/catalogo-temporada', methods=['GET', 'OPTIONS'])
 def get_catalogo_temporada():
-    if request.method == "OPTIONS":
-        return "", 200, cors_headers()
+    if request.method == 'OPTIONS':
+        return '', 200, cors_headers()
 
-    referencia = request.args.get("referencia")
+    referencia = request.args.get('referencia')
     if not referencia:
         return jsonify({"error": "Falta el código de 'temporada'"}), 400, cors_headers()
-
+    
     image_data = get_image_by_season(referencia)
 
     if image_data:
-        return (
-            jsonify(
-                {
-                    "message": f"{len(image_data)} artículos encontrados",
-                    "data": image_data,
-                }
-            ),
-            200,
-            cors_headers(),
-        )
+        return jsonify({
+            'message': f'{len(image_data)} artículos encontrados',
+            'data': image_data
+        }), 200, cors_headers()
     else:
         return jsonify({"error": "No se encontraron artículos"}), 404, cors_headers()
-
 
 # ruta prueba index
 @app.route("/")
 def index():
-    temporada = "V22"
+    temporada = 'V22'
     imagenes = get_image_by_season(temporada)
 
     if imagenes:
         data = []
         for img in imagenes:
             img.seek(0)
-            encoded = base64.b64encode(img.read()).decode("utf-8")
-            data.append({"imagen": encoded})
+            encoded = base64.b64encode(img.read()).decode('utf-8')
+            data.append({'imagen': encoded})
     else:
         data = []
 
     return render_template("indexPrueba.html", data=data)
 
 
-# Fin mi codigo
+# Fin mi codigo    
 
-
-@app.route("/formas-pago/resumen", methods=["GET", "OPTIONS"])
+@app.route('/formas-pago/resumen', methods=['GET', 'OPTIONS'])
 def resumen_formas_pago():
-    if request.method == "OPTIONS":
-        return "", 200, cors_headers()
-
-    tienda = request.args.get("tienda")
-    fechaini = request.args.get("fechaini")
-    fechafin = request.args.get("fechafin")
+    if request.method == 'OPTIONS':
+        return '', 200, cors_headers()
+    
+    tienda = request.args.get('tienda')
+    fechaini = request.args.get('fechaini')
+    fechafin = request.args.get('fechafin')
 
     if not all([tienda, fechaini, fechafin]):
-        return (
-            jsonify({"error": "Faltan parámetros: tienda, fechaini o fechafin"}),
-            400,
-            cors_headers(),
-        )
+        return jsonify({"error": "Faltan parámetros: tienda, fechaini o fechafin"}), 400, cors_headers()
 
     try:
         fechaini_dt = datetime.strptime(fechaini, "%Y-%m-%d")
         fechafin_dt = datetime.strptime(fechafin, "%Y-%m-%d")
     except ValueError:
-        return (
-            jsonify({"error": "Formato de fecha inválido. Usa YYYY-MM-DD"}),
-            400,
-            cors_headers(),
-        )
+        return jsonify({"error": "Formato de fecha inválido. Usa YYYY-MM-DD"}), 400, cors_headers()
 
     try:
         conn = get_connection()
@@ -1328,9 +1234,7 @@ def resumen_formas_pago():
         cursor.execute(query, (fechaini_dt, fechafin_dt))
         resultados = cursor.fetchall()
 
-        data = [
-            {"formapago": row[0], "total_importe": float(row[1])} for row in resultados
-        ]
+        data = [{"formapago": row[0], "total_importe": float(row[1])} for row in resultados]
         return jsonify(data), 200, cors_headers()
     except Exception as e:
         return jsonify({"error": str(e)}), 500, cors_headers()
@@ -1340,9 +1244,8 @@ def cors_headers():
     return {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization"
     }
 
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     app.run(debug=True, port=5000)
