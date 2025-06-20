@@ -119,8 +119,11 @@
     </style>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+<!-- jsPDF 3.x -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/3.0.1/jspdf.umd.min.js"></script>
+<!-- AutoTable 5.x compatible con jsPDF 3.x -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/5.0.2/jspdf.plugin.autotable.min.js"></script>
+
  <!--!!-->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script> 
 
@@ -157,7 +160,7 @@
                     <button id="btn-consulta" class="benefits-button" style="background-color: orange;">Consulta</button>
                     <button id="fetch-report" class="report-button">Existencias</button>
                     <button id="btn-historico" class="benefits-button">Histórico</button>
-                    <button id="btn-catalog" class="benefits-button">Catálgo temporada</button><!-- Mi codigo -->
+                    <button id="" class="benefits-button">Catálgo temporada</button><!-- Mi codigo -->
                     <button id="btn-export-pdf">Exportar catálogo a PDF</button><!-- Mi codigo -->
 
 
@@ -896,6 +899,78 @@ function exportarTablaAExcel() {
     link.download = "existencias.csv";
     link.click();
 }
+
+async function exportarTablaAPDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+
+    const tabla = document.querySelector("#table-container table");
+    if (!tabla) {
+        alert("No hay tabla para exportar.");
+        return;
+    }
+
+    const fechaInicio = document.getElementById("fecha-ventas")?.value || "Fecha inicio no seleccionada";
+    const fechaFin = document.getElementById("fecha-final")?.value || "Fecha final no seleccionada";
+
+    const filas = Array.from(tabla.querySelectorAll("tr"));
+    const headRows = [];
+    const bodyRows = [];
+    let inHeader = true;
+
+    for (const fila of filas) {
+        const row = [];
+        for (const cell of fila.children) {
+            const colspan = parseInt(cell.getAttribute("colspan") || "1");
+            const text = cell.innerText.trim();
+            for (let i = 0; i < colspan; i++) {
+                row.push(i === 0 ? text : "");
+            }
+        }
+
+        if (inHeader && fila.querySelectorAll("th").length > 0) {
+            headRows.push(row);
+        } else {
+            inHeader = false;
+            bodyRows.push(row);
+        }
+    }
+
+    // Dibujar encabezado solo en la primera hoja
+    const marginLeft = 40;
+    const headerStartY = 40;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(40);
+    doc.text("CUADRO DE BENEFICIOS POR PROVEEDOR - CALZADOS BREOGÁN, S.L.", marginLeft, headerStartY);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text(`Fechas seleccionadas: ${fechaInicio} a ${fechaFin}`, marginLeft, headerStartY + 20);
+
+    // Dibujar tabla dejando espacio para el encabezado solo en la primera página
+    doc.autoTable({
+        head: headRows,
+        body: bodyRows,
+        startY: headerStartY + 40,
+        margin: { left: marginLeft, right: marginLeft },
+        theme: "grid",
+        styles: {
+            fontSize: 6,
+            cellPadding: 2,
+            overflow: "linebreak"
+        },
+        headStyles: {
+            fillColor: [230, 230, 230],
+            textColor: 20,
+            fontSize: 7
+        }
+    });
+
+    doc.save("cuadro-beneficios.pdf");
+}
+
 
 document.getElementById("fetch-json").addEventListener("click", () => {
     const fechaInput = document.getElementById("fecha-ventas");
@@ -1747,15 +1822,14 @@ articulosMap.forEach((articulo, cod) => {
 
 
 
-    /**
-     *!!Exportar usando html2pdf
+   
     document.getElementById("btn-export-pdf").addEventListener("click",  () => {
       const contenedor = document.getElementById("table-container");
 
       const options = {
         filename : 'catalogo.pdf',
         image: { type:'pdf', quality: 0.98 },
-        html2canvas: { scale: 2 },
+        html2canvas: { scale: 1 },
         jsPDF: {
           unit: 'mm',
           format: 'a4',
@@ -1773,93 +1847,92 @@ articulosMap.forEach((articulo, cod) => {
 
     })
 
-*/
 
 
-  /**
-     *!!Exportar función larga */
-    // Función para generar el PDF con encabezado y pie de página
-document.getElementById("btn-export-pdf").addEventListener("click", async () => {
-    if (!codigoTemporadaActual) {
-        alert("Primero busca una temporada");
-        return;
-    }
 
-    const element = document.getElementById("table-container");
+  
+//     // Función para generar el PDF con encabezado y pie de página
+// document.getElementById("btn-export-pdf").addEventListener("click", async () => {
+//     if (!codigoTemporadaActual) {
+//         alert("Primero busca una temporada");
+//         return;
+//     }
+
+//     const element = document.getElementById("table-container");
     
-    // Configuración de html2pdf
-    const options = {
-        margin: [20, 15, 20, 15], // [top, left, bottom, right] en mm
-        filename: `catalogo_${codigoTemporadaActual}.pdf`,
-        image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: { 
-            scale: 2,
-            useCORS: true,
-            logging: true,
-            onclone: (clonedDoc) => {
-                // Añadir encabezado y pie de página a cada página
-                const pages = clonedDoc.querySelectorAll('.pagina-catalogo');
-                pages.forEach((page, index) => {
-                    // Crear contenedor de encabezado
-                    const header = document.createElement('div');
-                    header.innerHTML = `
-                        <div style="
-                            text-align: center;
-                            margin-bottom: 15px;
-                            padding-bottom: 10px;
-                            border-bottom: 1px solid #eee;
-                        ">
-                            <h2 style="margin: 0; color: #333;">Catálogo ${codigoTemporadaActual}</h2>
-                        </div>
-                    `;
-                    page.insertBefore(header, page.firstChild);
+//     // Configuración de html2pdf
+//     const options = {
+//         margin: [20, 15, 20, 15], // [top, left, bottom, right] en mm
+//         filename: `catalogo_${codigoTemporadaActual}.pdf`,
+//         image: { type: 'jpeg', quality: 0.95 },
+//         html2canvas: { 
+//             scale: 2,
+//             useCORS: true,
+//             logging: true,
+//             onclone: (clonedDoc) => {
+//                 // Añadir encabezado y pie de página a cada página
+//                 const pages = clonedDoc.querySelectorAll('.pagina-catalogo');
+//                 pages.forEach((page, index) => {
+//                     // Crear contenedor de encabezado
+//                     const header = document.createElement('div');
+//                     header.innerHTML = `
+//                         <div style="
+//                             text-align: center;
+//                             margin-bottom: 15px;
+//                             padding-bottom: 10px;
+//                             border-bottom: 1px solid #eee;
+//                         ">
+//                             <h2 style="margin: 0; color: #333;">Catálogo ${codigoTemporadaActual}</h2>
+//                         </div>
+//                     `;
+//                     page.insertBefore(header, page.firstChild);
                     
-                    // Crear pie de página
-                    const footer = document.createElement('div');
-                    footer.innerHTML = `
-                        <div style="
-                            text-align: center;
-                            margin-top: 15px;
-                            padding-top: 10px;
-                            border-top: 1px solid #eee;
-                            font-size: 12px;
-                            color: #666;
-                        ">
-                            Página ${index + 1}
-                        </div>
-                    `;
-                    page.appendChild(footer);
+//                     // Crear pie de página
+//                     const footer = document.createElement('div');
+//                     footer.innerHTML = `
+//                         <div style="
+//                             text-align: center;
+//                             margin-top: 15px;
+//                             padding-top: 10px;
+//                             border-top: 1px solid #eee;
+//                             font-size: 12px;
+//                             color: #666;
+//                         ">
+//                             Página ${index + 1}
+//                         </div>
+//                     `;
+//                     page.appendChild(footer);
                     
-                    // Ajustar grid para mantener 4x4
-                    page.style.gridTemplateRows = 'auto repeat(4, 1fr) auto';
-                    page.style.height = 'auto';
-                    page.style.minHeight = '277mm'; // Altura A4
-                });
-            }
-        },
-        jsPDF: { 
-            unit: 'mm', 
-            format: 'a4', 
-            orientation: 'portrait' 
-        },
-        pagebreak: { 
-            mode: 'css', 
-            before: '.pagina-catalogo'
-        }
-    };
+//                     // Ajustar grid para mantener 4x4
+//                     page.style.gridTemplateRows = 'auto repeat(4, 1fr) auto';
+//                     page.style.height = 'auto';
+//                     page.style.minHeight = '277mm'; // Altura A4
+//                 });
+//             }
+//         },
+//         jsPDF: { 
+//             unit: 'mm', 
+//             format: 'a4', 
+//             orientation: 'portrait' 
+//         },
+//         pagebreak: { 
+//             mode: 'css', 
+//             before: '.pagina-catalogo'
+//         }
+//     };
 
-    try {
-        // Espera a que carguen las imágenes
-        await esperarImagenesCargadas(element);
+//     try {
+//         // Espera a que carguen las imágenes
+//         await esperarImagenesCargadas(element);
         
-        // Generar PDF
-        await html2pdf().set(options).from(element).save();
+//         // Generar PDF
+//         await html2pdf().set(options).from(element).save();
         
-    } catch (error) {
-        console.error("Error generando PDF:", error);
-        alert(`Error al generar PDF: ${error.message}`);
-    }
-});
+//     } catch (error) {
+//         console.error("Error generando PDF:", error);
+//         alert(`Error al generar PDF: ${error.message}`);
+//     }
+// });
 
 
 /**
