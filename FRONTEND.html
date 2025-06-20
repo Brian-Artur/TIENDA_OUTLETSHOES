@@ -121,106 +121,10 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+ <!--!!-->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script> 
 
 
-<script>
-let lastHistoricoData = [];
-
-function exportarTablaAExcel() {
-    const tabla = document.querySelector("#table-container table");
-    if (!tabla) return alert("No hay tabla para exportar.");
-
-    let csv = [];
-    for (let fila of tabla.rows) {
-        let row = [];
-        for (let celda of fila.cells) {
-            row.push('"' + celda.innerText.replace(/"/g, '""') + '"');
-        }
-        csv.push(row.join(","));
-    }
-
-    const blob = new Blob([csv.join("\n")], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "existencias.csv";
-    link.click();
-}
-
-// Exporta datos a PDF usando jsPDF
-async function exportarTablaAPDF() {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
-
-    const tabla = document.querySelector("#table-container table");
-    if (!tabla) {
-        alert("No hay tabla para exportar.");
-        return;
-    }
-
-    const fechaInicio = document.getElementById("fecha-ventas")?.value || "Fecha inicio no seleccionada";
-    const fechaFin = document.getElementById("fecha-final")?.value || "Fecha final no seleccionada";
-
-    const filas = Array.from(tabla.querySelectorAll("tr"));
-    const headRows = [];
-    const bodyRows = [];
-    let inHeader = true;
-
-    for (const fila of filas) {
-        const row = [];
-        for (const cell of fila.children) {
-            const colspan = parseInt(cell.getAttribute("colspan") || "1");
-            const text = cell.innerText.trim();
-            for (let i = 0; i < colspan; i++) {
-                row.push(i === 0 ? text : "");
-            }
-        }
-
-        if (inHeader && fila.querySelectorAll("th").length > 0) {
-            headRows.push(row);
-        } else {
-            inHeader = false;
-            bodyRows.push(row);
-        }
-    }
-
-    // Dibujar encabezado solo en la primera hoja
-    const marginLeft = 40;
-    const headerStartY = 40;
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
-    doc.setTextColor(40);
-    doc.text("CUADRO DE BENEFICIOS POR PROVEEDOR - CALZADOS BREOGÁN, S.L.", marginLeft, headerStartY);
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.text(`Fechas seleccionadas: ${fechaInicio} a ${fechaFin}`, marginLeft, headerStartY + 20);
-
-    // Dibujar tabla dejando espacio para el encabezado solo en la primera página
-    doc.autoTable({
-        head: headRows,
-        body: bodyRows,
-        startY: headerStartY + 40,
-        margin: { left: marginLeft, right: marginLeft },
-        theme: "grid",
-        styles: {
-            fontSize: 6,
-            cellPadding: 2,
-            overflow: "linebreak"
-        },
-        headStyles: {
-            fillColor: [230, 230, 230],
-            textColor: 20,
-            fontSize: 7
-        }
-    });
-
-    doc.save("cuadro-beneficios.pdf");
-}
-
-</script>
 
 </head>
 <body>
@@ -249,18 +153,21 @@ async function exportarTablaAPDF() {
             <!-- Derecha -->
             <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 10px;">
                 <!-- Grupo de botones principales -->
-                <div id="button-group-top" class="button-group" style="display: flex; gap: 10px; justify-content: flex-end; width: 100%;">
+                <div class="button-group" style="display: flex; gap: 10px; justify-content: flex-end; width: 100%;">
                     <button id="btn-consulta" class="benefits-button" style="background-color: orange;">Consulta</button>
                     <button id="fetch-report" class="report-button">Existencias</button>
                     <button id="btn-historico" class="benefits-button">Histórico</button>
-                    <button id="btn-fotos-temporada" class="benefits-button" style="background-color: #800080;">Catálogo Temporada</button>
+                    <button id="btn-catalog" class="benefits-button">Catálgo temporada</button><!-- Mi codigo -->
+                    <button id="btn-export-pdf">Exportar catálogo a PDF</button><!-- Mi codigo -->
+
+
                     <!--<button id="btn-beneficios" class="benefits-button" style="background-color: #444;">Informe por Proveedores</button>-->
                     <!--<button id="btn-beneficios-temporadas" class="benefits-button" style="background-color: #444;">Informe por Temporadas</button>-->
                     <!--<button id="btn-cierres-caja" class="benefits-button" style="background-color: #444;">Cierres de Caja</button>-->
                 </div>
 
                 <!-- Botones de exportación en una línea nueva -->
-                <div id="button-group-bot" style="display: flex; justify-content: flex-end; gap: 10px; width: 100%;">
+                <div style="display: flex; justify-content: flex-end; gap: 10px; width: 100%;">
                     <button onclick="imprimirTicket()">Imprimir Artículos Vendidos</button>
                     <button onclick="exportarTablaAExcel()">Exportar a Excel</button>
                     <button onclick="exportarTablaAPDF()">Exportar a PDF</button>
@@ -281,15 +188,23 @@ async function exportarTablaAPDF() {
         const specificApiUrlHistoricoStocks = "https://abincodigital.loclx.io/historico-stocks";
         const specificApiUrlConsulta = "https://abincodigital.loclx.io/consulta";
 
-        /** 
-         * ! URL local ppara botón 
-        */
-        const specificApiUrlFotosTemporada = "http://localhost:5000/articulos-temporada";
-
         // Elementos del DOM
         const fetchButton = document.getElementById('fetch-json');
         const reportButton = document.getElementById('fetch-report');
         const tableContainer = document.getElementById('table-container');
+
+    //funcion para esperar imgenes del contenedor //Mi codigo
+    function esperarImagenesCargadas(contenedor) {
+        const imagenes = contenedor.querySelectorAll("img");
+        const promesas = Array.from(imagenes).map(img => {
+            if (img.complete && img.naturalHeight !== 0) return Promise.resolve();
+            return new Promise(resolve => {
+                img.onload = img.onerror = resolve;
+            });
+        });
+    return Promise.all(promesas);
+    }
+
 
         // Función para obtener ventas realizadas
         async function fetchLambdaResult() {
@@ -316,7 +231,8 @@ async function exportarTablaAPDF() {
             }
         }
 
-        // Función para generar un reporte de existencias por proveedor
+        /** 
+         **! Función para generar la tabla de las "EXISTENCIAS DEL PROVEEDOR" */
         async function generateReport() {
             try {
                 const proveedor = (prompt("Introduce los 3 caracteres identificativos del proveedor:") || "").trim().toUpperCase();
@@ -350,11 +266,11 @@ async function exportarTablaAPDF() {
 
         // Función para renderizar la tabla con múltiples registros
         function renderTable(data) {
-            document.getElementById("filtros-temporada").innerHTML = "";
-                if (!data || !Array.isArray(data)) {
-                    tableContainer.innerHTML = '<p class="error">Invalid "data" field.</p>';
-                    return;
-                }
+    document.getElementById("filtros-temporada").innerHTML = "";
+            if (!data || !Array.isArray(data)) {
+                tableContainer.innerHTML = '<p class="error">Invalid "data" field.</p>';
+                return;
+            }
 
             // Crear la tabla con encabezados fijos
             let tableHtml = `
@@ -399,30 +315,30 @@ async function exportarTablaAPDF() {
 
             // Agregar la tabla al contenedor
             let filtrosHtml = `
-                <strong>Filtrar por temporada:</strong>
-                <label><input type="checkbox" value="V25" onchange="filtrarPorTemporada()"> V25</label>
-                <label><input type="checkbox" value="V14" onchange="filtrarPorTemporada()"> V14</label>
-            `;
-            //document.getElementById("filtros-temporada").innerHTML = filtrosHtml;
-            tableContainer.innerHTML = tableHtml;
+    <strong>Filtrar por temporada:</strong>
+    <label><input type="checkbox" value="V25" onchange="filtrarPorTemporada()"> V25</label>
+    <label><input type="checkbox" value="V14" onchange="filtrarPorTemporada()"> V14</label>
+`;
+//document.getElementById("filtros-temporada").innerHTML = filtrosHtml;
+tableContainer.innerHTML = tableHtml;
 
-            // Agregar evento de doble clic a cada referencia
-            const referenciaCells = document.querySelectorAll('.referencia-cell');
-            referenciaCells.forEach(cell => {
-                cell.addEventListener('dblclick', function() {
-                    const referencia = this.getAttribute('data-referencia');
-                    showArticuloImage(referencia);  // Llamar a la función para obtener la imagen
-                });
-            });
+// Agregar evento de doble clic a cada referencia
+    const referenciaCells = document.querySelectorAll('.referencia-cell');
+    referenciaCells.forEach(cell => {
+        cell.addEventListener('dblclick', function() {
+            const referencia = this.getAttribute('data-referencia');
+            showArticuloImage(referencia);  // Llamar a la función para obtener la imagen
+        });
+    });
         }
 
-        // No se utiliza este array
+        // Función para renderizar la tabla de existencias
         let existenciasOriginales = [];
-        // Muestra tabla de existencias
-        function renderTableExistencias(data) {
-            setTimeout(() => {
-                generarCheckboxTemporadas();
-            }, 100);
+
+function renderTableExistencias(data) {
+    setTimeout(() => {
+        generarCheckboxTemporadas();
+    }, 100);
             if (!data || !Array.isArray(data)) {
                 tableContainer.innerHTML = '<p class="error">Invalid "data" field.</p>';
                 return;
@@ -544,15 +460,15 @@ async function exportarTablaAPDF() {
 
             // Agregar la tabla al contenedor
             let filtrosHtml = `
-                <strong>Filtrar por temporada:</strong>
-                <label><input type="checkbox" value="V25" onchange="filtrarPorTemporada()"> V25</label>
-                <label><input type="checkbox" value="V14" onchange="filtrarPorTemporada()"> V14</label>
-            `;
-            document.getElementById("filtros-temporada").innerHTML = filtrosHtml;
-            tableContainer.innerHTML = tableHtml;
+    <strong>Filtrar por temporada:</strong>
+    <label><input type="checkbox" value="V25" onchange="filtrarPorTemporada()"> V25</label>
+    <label><input type="checkbox" value="V14" onchange="filtrarPorTemporada()"> V14</label>
+`;
+document.getElementById("filtros-temporada").innerHTML = filtrosHtml;
+tableContainer.innerHTML = tableHtml;
+
         }
 
-        // Muestra detalles de stock por referencia
         // Función para llamar a una API específica por fila
         async function showDetailsStocks(referencia, index) {
             const detailsRowId = `details-row-${index}`;
@@ -699,7 +615,7 @@ async function exportarTablaAPDF() {
             }
         }
 
-        // Muestra histórico de ventas por referencia 
+
         // Función para llamar a una API específica por fila
         async function showDetailsHistorico(referencia, index) {
             const detailsRowId = `details-historico-${index}`;
@@ -847,6 +763,9 @@ async function exportarTablaAPDF() {
 
         // Eventos
         //fetchButton.addEventListener('click', fetchLambdaResult);
+        /**
+         **! Botón existencias
+        */
         reportButton.addEventListener('click', generateReport);
     
 document.addEventListener("DOMContentLoaded", () => {
@@ -956,7 +875,6 @@ function generarCheckboxTemporadas() {
     filtrarPorTemporada();
 }
 
-// Exporta datos a CSV
 function exportarTablaAExcel() {
     const tabla = document.querySelector("#table-container table");
     if (!tabla) return alert("No hay tabla para exportar.");
@@ -1484,10 +1402,12 @@ function renderTableCierresCaja(data) {
 
 }
 
-
+/**
+ **! Botón "Histórico" */
 document.getElementById("btn-historico").addEventListener("click", generateHistoricoStock);
 
-
+/**
+ **! Obtener datos para función "Histórico" */
 async function generateHistoricoStock() {
     const referencia = prompt("Introduce la referencia o código de barras del artículo:");
     if (!referencia || referencia.trim() === "") {
@@ -1506,9 +1426,13 @@ async function generateHistoricoStock() {
             throw new Error(`Error: ${response.statusText}`);
         }
 
+        /**
+        **! Manejo de respuesta "Histórico" */
         const jsonData = await response.json();
 
-        lastHistoricoData = jsonData.data;
+        /** 
+         *?! Variable que no se usa */
+        lastHistoricoData = jsonData.data;      
 
         if (jsonData.data && Array.isArray(jsonData.data)) {
             renderHistoricoStock(jsonData.data);
@@ -1520,6 +1444,8 @@ async function generateHistoricoStock() {
     }
 }
 
+/**
+ **! Renderizar tabla "Histórico" para un producto */
 function renderHistoricoStock(data) {
     if (!Array.isArray(data) || data.length === 0) {
         document.getElementById("table-container").innerHTML = "<p class='error'>No hay datos para mostrar.</p>";
@@ -1527,6 +1453,8 @@ function renderHistoricoStock(data) {
     }
 
     // Detectar columnas base y columnas de talla
+    /**
+    **! 3 Columnas de la izquierda */
     const columnasFijas = ["MOVIMIENTO", "TIENDA", "FECHA"];
     const todasColumnas = Object.keys(data[0]);
     const columnasTalla = todasColumnas.filter(c => !["FECHA", "REFPROVEEDOR", "DESCRIPCION", "COLOR", "TIENDA", "MOVIMIENTO"].includes(c));
@@ -1537,6 +1465,8 @@ function renderHistoricoStock(data) {
         .filter(cb => cb.checked)
         .map(cb => cb.value);
 
+    /**
+    **! Columnas de la derecha (tallas) */
     const columnasFiltradas = columnasTalla.filter(talla =>
         tallasSeleccionadas.length === 0 || tallasSeleccionadas.includes(talla)
     );
@@ -1588,6 +1518,8 @@ function renderHistoricoStock(data) {
     const referencia = data[0].REFPROVEEDOR || "";
     const descripcion = data[0].DESCRIPCION || "";
     const color = data[0].COLOR || "";
+    /**
+    **! Sobre-encabezado negro de la tabla */
     tableHtml += `<tr><td colspan="${columnasFijas.length + columnasFiltradas.length}" style="font-weight: bold; text-align: left; padding: 10px; background-color: black; color: white;">${referencia} - ${descripcion} - ${color}</td></tr>`;
 
     columnasFijas.forEach(col => {
@@ -1678,7 +1610,10 @@ function formatearFecha(fechaISO) {
     return `${dia}/${mes}/${anio}`;
 }
 
-
+/**
+ ** Botón consulta
+ http://localhost:5000/consulta?referencia=PIT10033MR
+ */
 document.getElementById("btn-consulta").addEventListener("click", async () => {
     const referencia = prompt("Introduce la referencia o código de barras del artículo:");
     if (!referencia || referencia.trim() === "") {
@@ -1707,6 +1642,355 @@ document.getElementById("btn-consulta").addEventListener("click", async () => {
         tableContainer.innerHTML = `<p class="error">Error: ${error.message}</p>`;
     }
 });
+
+
+let referencia = '';
+// Mi codigo
+// evento click para el botón mostrar producto-temporada
+document.getElementById("btn-catalog").addEventListener("click", async () => {
+    referencia = prompt("Introduce código de la temporada:").toLocaleUpperCase();
+    if (!referencia || referencia.trim() === "") {
+        tableContainer.innerHTML = '<p class="error">Consulta cancelada. No se proporcionó una referencia.</p>';
+        return;
+    }
+
+    tableContainer.innerHTML = "Cargando imágenes del catálogo...";
+    //bloque try-catch para llamar a la API
+    try {
+        const response = await fetch(`http://localhost:5000/catalogo-temporada?referencia=${referencia}`)
+        if (!response.ok) throw new Error("Error al obtener las imágenes");
+
+        const result = await response.json();
+
+        //creamos el html llamando a la función para renderizar el catálogo
+        tableContainer.innerHTML = `
+            <h2> Catálogo de imagenes</h2>
+            ${renderCatalogo(result.data)}
+        `
+    }catch(error){
+        tableContainer.innerHTML = `<p class="error">Error: ${error.message}</p>`
+    }
+});
+
+//función para renderizar catálogo
+function renderCatalogo(data) {
+    if (!Array.isArray(data) || data.length === 0) return "<p>Sin datos</p>";
+
+    //imagen para artículos sin foto
+    //const imagenGenerica = "./img/articulo-sin-foto.png";
+    const imagenGenerica = "http://localhost:5000/imagen-generica";
+
+    // Agrupar artículos por codarticulo
+    const articulosMap = new Map();
+
+    data.forEach(item => {
+        const cod = item.codarticulo;
+
+        if (!articulosMap.has(cod)) {
+            articulosMap.set(cod, {
+                descripcion: item.descripcion,
+                descripcionadic: item.descripcionadic,
+                foto: item.foto,
+                tallas: new Set()
+            });
+        }
+
+        articulosMap.get(cod).tallas.add(item.talla);
+    });
+
+    // Render catálogo como tabla visual
+    let html = `
+  <div id="galeria" style="
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    padding: 20px;
+  ">
+`;
+
+articulosMap.forEach((articulo, cod) => {
+     //Aquí usamos imagen base64 si hay, si no, usamos la imagen genérica
+        const imagenSrc = articulo.foto
+            ? `data:image/jpeg;base64,${articulo.foto}`
+            : imagenGenerica;
+
+    html += `
+        <div style="
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            padding: 15px;
+            text-align: center;
+            transition: transform 0.2s;
+        "
+        onmouseover="this.style.transform='scale(1.02)'"
+        onmouseout="this.style.transform='scale(1)'"
+        >
+            <img src="${imagenSrc}" 
+                 alt="Imagen del artículo" 
+                 style="width: 100%; height: auto; border-radius: 8px; object-fit: cover; max-height: 200px;">
+            
+            <h3 style="margin: 10px 0 5px;">${articulo.descripcion}</h3>
+            <p style="color: #666; font-size: 0.9em;">Código: <strong>${articulo.descripcionadic}</strong></p>
+            <div style="margin-top: 10px;">
+                <span style="font-weight: bold;">Tallas disponibles:</span><br>
+                <span style="display: inline-block; margin-top: 5px; color: #444;">
+                    ${Array.from(articulo.tallas).join(', ')}
+                </span>
+            </div>
+        </div>
+    `;
+});
+    html += `</div>`;
+    return html;
+}
+
+
+
+    /**
+     *!!Exportar usando html2pdf
+    document.getElementById("btn-export-pdf").addEventListener("click",  () => {
+      const contenedor = document.getElementById("table-container");
+
+      const options = {
+        filename : 'catalogo.pdf',
+        image: { type:'pdf', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: {
+          unit: 'mm',
+          format: 'a4',
+          orientation: 'portrait',   // landscape
+          margin: { top: 2, right: 3, bottom: 2, left: 3 }
+        }
+      }
+
+      html2pdf().set(options).from(contenedor).save();
+    //   html2pdf().set(options).from(contenedor).toPdf().get('pdf').then(
+    //     function(pdf) {
+    //         const newWindow = window.open(pdf.uotput('bloburl'), '_blank')
+    //     }
+    //   );
+
+    })
+
+*/
+
+
+  /**
+     *!!Exportar función larga */
+    // Función para generar el PDF con encabezado y pie de página
+document.getElementById("btn-export-pdf").addEventListener("click", async () => {
+    if (!codigoTemporadaActual) {
+        alert("Primero busca una temporada");
+        return;
+    }
+
+    const element = document.getElementById("table-container");
+    
+    // Configuración de html2pdf
+    const options = {
+        margin: [20, 15, 20, 15], // [top, left, bottom, right] en mm
+        filename: `catalogo_${codigoTemporadaActual}.pdf`,
+        image: { type: 'jpeg', quality: 0.95 },
+        html2canvas: { 
+            scale: 2,
+            useCORS: true,
+            logging: true,
+            onclone: (clonedDoc) => {
+                // Añadir encabezado y pie de página a cada página
+                const pages = clonedDoc.querySelectorAll('.pagina-catalogo');
+                pages.forEach((page, index) => {
+                    // Crear contenedor de encabezado
+                    const header = document.createElement('div');
+                    header.innerHTML = `
+                        <div style="
+                            text-align: center;
+                            margin-bottom: 15px;
+                            padding-bottom: 10px;
+                            border-bottom: 1px solid #eee;
+                        ">
+                            <h2 style="margin: 0; color: #333;">Catálogo ${codigoTemporadaActual}</h2>
+                        </div>
+                    `;
+                    page.insertBefore(header, page.firstChild);
+                    
+                    // Crear pie de página
+                    const footer = document.createElement('div');
+                    footer.innerHTML = `
+                        <div style="
+                            text-align: center;
+                            margin-top: 15px;
+                            padding-top: 10px;
+                            border-top: 1px solid #eee;
+                            font-size: 12px;
+                            color: #666;
+                        ">
+                            Página ${index + 1}
+                        </div>
+                    `;
+                    page.appendChild(footer);
+                    
+                    // Ajustar grid para mantener 4x4
+                    page.style.gridTemplateRows = 'auto repeat(4, 1fr) auto';
+                    page.style.height = 'auto';
+                    page.style.minHeight = '277mm'; // Altura A4
+                });
+            }
+        },
+        jsPDF: { 
+            unit: 'mm', 
+            format: 'a4', 
+            orientation: 'portrait' 
+        },
+        pagebreak: { 
+            mode: 'css', 
+            before: '.pagina-catalogo'
+        }
+    };
+
+    try {
+        // Espera a que carguen las imágenes
+        await esperarImagenesCargadas(element);
+        
+        // Generar PDF
+        await html2pdf().set(options).from(element).save();
+        
+    } catch (error) {
+        console.error("Error generando PDF:", error);
+        alert(`Error al generar PDF: ${error.message}`);
+    }
+});
+
+
+/**
+ * !! Función para renderizar el catálogo (modificada para estructura completa)
+function renderCatalogo(data) {
+    if (!Array.isArray(data) || data.length === 0) return "<p>Sin datos</p>";
+
+    const imagenGenerica = "http://localhost:5000/imagen-generica";
+    const articulosMap = new Map();
+
+    // Agrupar artículos
+    data.forEach(item => {
+        const cod = item.codarticulo;
+        if (!articulosMap.has(cod)) {
+            articulosMap.set(cod, {
+                descripcion: item.descripcion,
+                descripcionadic: item.descripcionadic,
+                foto: item.foto,
+                tallas: new Set()
+            });
+        }
+        articulosMap.get(cod).tallas.add(item.talla);
+    });
+
+    const articulosArray = Array.from(articulosMap.values());
+    const articulosPorPagina = 16;
+    const paginas = [];
+    
+    for (let i = 0; i < articulosArray.length; i += articulosPorPagina) {
+        paginas.push(articulosArray.slice(i, i + articulosPorPagina));
+    }
+
+    let html = '<div id="pdf-content">';
+    
+    // Generar HTML para cada página
+    paginas.forEach((pagina, index) => {
+        html += `
+        <div class="pagina-catalogo" style="
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(4, 1fr);
+            gap: 15px;
+            padding: 20px;
+            page-break-after: always;
+            box-sizing: border-box;
+            width: 100%;
+        ">`;
+        
+        pagina.forEach(articulo => {
+            const imagenSrc = articulo.foto 
+                ? `data:image/jpeg;base64,${articulo.foto}`
+                : imagenGenerica;
+
+            html += `
+            <div class="tarjeta-articulo" style="
+                background: #fff;
+                border-radius: 8px;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+                padding: 10px;
+                text-align: center;
+                display: flex;
+                flex-direction: column;
+                height: 100%;
+                box-sizing: border-box;
+            ">
+                <img src="${imagenSrc}" 
+                     style="
+                         width: 100%;
+                         height: 120px;
+                         border-radius: 6px;
+                         object-fit: contain;
+                         background: #f5f5f5;
+                         margin-bottom: 8px;
+                     ">
+                
+                <h3 style="
+                    margin: 0 0 5px;
+                    font-size: 14px;
+                    flex-grow: 1;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                ">${articulo.descripcion}</h3>
+                
+                <div style="margin-top: auto;">
+                    <p style="color: #666; font-size: 12px; margin: 0;">${articulo.descripcionadic}</p>
+                    <p style="font-size: 11px; color: #444; margin: 5px 0 0;">
+                        <strong>Tallas:</strong> ${Array.from(articulo.tallas).join(', ')}
+                    </p>
+                </div>
+            </div>`;
+        });
+        
+        // Rellenar espacios vacíos si es necesario
+        if (pagina.length < articulosPorPagina) {
+            const espaciosVacios = articulosPorPagina - pagina.length;
+            for (let i = 0; i < espaciosVacios; i++) {
+                html += `<div style="visibility: hidden;"></div>`;
+            }
+        }
+        
+        html += `</div>`; // Cierre de página
+    });
+    
+    html += '</div>'; // Cierre del contenedor principal
+    return html;
+}
+
+*/
+
+// Función auxiliar para esperar carga de imágenes
+function esperarImagenesCargadas(container) {
+    const images = container.getElementsByTagName('img');
+    const promises = [];
+    
+    for (const img of images) {
+        if (!img.complete || img.naturalHeight === 0) {
+            promises.push(new Promise((resolve, reject) => {
+                img.onload = resolve;
+                img.onerror = () => reject(new Error(`Error cargando imagen: ${img.src}`));
+            }));
+        }
+    }
+    
+    return Promise.all(promises);
+}
+
+
+
+
+// Fin mi codigo
 
 function renderMiniTable(data, tipo = "") {
     if (!Array.isArray(data) || data.length === 0) return "<p>Sin datos</p>";
@@ -1816,16 +2100,16 @@ function imprimirTicket() {
 
 
 //document.getElementById("btn-cierres-caja").addEventListener("click", fetchCierresCaja);
-// Pasándole una referencia, te hace un fetch a la ruta
+
 function showArticuloImage(referencia) {
     // Realizamos la petición para obtener la imagen desde la API
     fetch(`https://abincodigital.loclx.io/articulo/foto?referencia=${referencia}`)
-        .then(response => {                    // Valida la respuesta
+        .then(response => {
             if (!response.ok) {
                 throw new Error('Imagen no encontrada');
             }
 
-            // Verificamos el tipo de contenido (que sea una imagen)
+            // Verificamos el tipo de contenido
             const contentType = response.headers.get('Content-Type');
             if (!contentType || !contentType.startsWith('image/')) {
                 throw new Error('La respuesta no es una imagen');
@@ -1848,7 +2132,6 @@ function showArticuloImage(referencia) {
 function showImageInModal(imageUrl) {
     // Crear un modal para mostrar la imagen
     const modal = document.createElement('div');
-
     modal.style.position = 'fixed';
     modal.style.top = '0';
     modal.style.left = '0';
@@ -1885,238 +2168,6 @@ function showImageInModal(imageUrl) {
     modal.appendChild(closeBtn);
     document.body.appendChild(modal);
 }
-
-// Antes de necesitarla, convierte la imagen a base64
-function getLocalImageAsBase64() {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.crossOrigin = 'Anonymous';
-    img.src = 'ruta/a/tu/imagen.png';
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0);
-      resolve(canvas.toDataURL('image/png'));
-    };
-  });
-}
-
-
-// Función de expoortación de la galería
-async function exportGalleryToPDF() {
-  const gallery = document.getElementById('gallery');
-  if (!gallery) return alert('No hay galería para exportar');
-
-  await loadAllImages(gallery);
-
-  html2canvas(gallery, {
-    useCORS: true,
-    allowTaint: false,
-    logging: true,
-    scale: 1
-  }).then(canvas => {
-    const imgData = canvas.toDataURL('image/jpeg', 1.0);
-    const pdf = new jspdf.jsPDF('p', 'mm', 'a4');
-    
-    // Definir márgenes
-    const marginHorizontal = 10; // 1cm = 10mm
-    const marginVertical = 20;   // 2cm = 20mm
-    
-    // Calcular área disponible para la imagen
-    const pageWidth = pdf.internal.pageSize.getWidth() - (2 * marginHorizontal);
-    const pageHeight = pdf.internal.pageSize.getHeight() - (2 * marginVertical);
-
-    const imgProps = pdf.getImageProperties(imgData);
-    
-    // Calcular dimensiones manteniendo relación de aspecto
-    let pdfWidth = pageWidth;
-    let pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-    
-    // Si la imagen es más alta que el área disponible, ajustar
-    if (pdfHeight > pageHeight) {
-      pdfHeight = pageHeight;
-      pdfWidth = (imgProps.width * pdfHeight) / imgProps.height;
-    }
-
-    // Posición X centrada horizontalmente si la imagen es más estrecha que el área disponible
-    const xPos = marginHorizontal + (pageWidth - pdfWidth) / 2;
-    
-    // Posición Y centrada verticalmente si la imagen es más corta que el área disponible
-    const yPos = marginVertical + (pageHeight - pdfHeight) / 2;
-
-    if (pdfHeight <= pageHeight) {
-      // Si cabe en una sola página
-      pdf.addImage(imgData, 'JPEG', xPos, yPos, pdfWidth, pdfHeight);
-    } else {
-      // Si requiere múltiples páginas (paginación vertical)
-      let position = 0;
-      while (position < pdfHeight) {
-        const remainingHeight = pdfHeight - position;
-        const displayHeight = Math.min(remainingHeight, pageHeight);
-        
-        pdf.addImage(
-          imgData, 
-          'JPEG', 
-          xPos, 
-          marginVertical - position, 
-          pdfWidth, 
-          pdfHeight
-        );
-        
-        position += pageHeight;
-        if (position < pdfHeight) {
-          pdf.addPage();
-        }
-      }
-    }
-
-    const fecha = new Date().toISOString().slice(0, 10);
-    pdf.save(`articulos-${fecha}.pdf`);
-  }).catch(error => {
-    console.error('Error al generar PDF:', error);
-    alert('Error al generar PDF: ' + error.message);
-  });
-}
-
-          const groupBtnTop = document.getElementById("button-group-top")
-
-          // Crear botón para exportar   
-          const exportBtn = document.createElement('button');
-          exportBtn.textContent = 'Exportar a PDF';
-          exportBtn.className = 'btn btn-success fw-bold';
-          exportBtn.style.marginTop = '20px';
-          exportBtn.style.backgroundColor = '#b53c6e';
-          exportBtn.style.display = 'block';
-          exportBtn.style.marginInline = 'auto';
-          exportBtn.addEventListener('click', exportGalleryToPDF);
-          groupBtnTop.appendChild(exportBtn);
-
-
-
-// Función auxiliar para asegurar carga de imágenes
-function loadAllImages(container) {
-  const images = container.getElementsByTagName('img');
-  const promises = [];
-  
-  for (const img of images) {
-    if (!img.complete || img.naturalHeight === 0) {
-      promises.push(new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = () => reject(new Error(`Error cargando imagen: ${img.src}`));
-      }));
-    }
-  }
-  
-  return Promise.all(promises);
-}
-
-
-        // Obtén referencia al botón de fotos temporada
-        const fotosTemporadaButton = document.getElementById('btn-fotos-temporada');
-
-        fotosTemporadaButton.addEventListener('click', function () {
-  let temporada = prompt("Indique la temporada (ej: V25, I22)");
-  if (!temporada) return;
-  temporada = temporada.toUpperCase();
-
-  let offset = 0;
-  const limit = 20;
-
-  function cargarPagina(offsetActual) {
-    tableContainer.innerHTML = '<div style="text-align: center; padding: 20px;">Cargando artículos...</div>';
-
-    fetch(`${specificApiUrlFotosTemporada}?temporada=${temporada}&offset=${offsetActual}`)
-      .then(response => {
-        if (!response.ok) {
-          throw new Error('Error en la respuesta del servidor');
-        }
-        return response.json();
-      })
-      .then(data => {
-        tableContainer.innerHTML = '';
-
-        if (data.articulos && Array.isArray(data.articulos) && data.articulos.length > 0) {
-          const gallery = document.createElement('div');
-            // Id para manejar la impresión por pdf de la galería.
-          gallery.id = 'gallery';
-
-          gallery.style.display = 'flex';
-          gallery.style.flexWrap = 'wrap';
-          gallery.style.gap = '20px';
-          gallery.style.justifyContent = 'center';
-
-          data.articulos.forEach(articulo => {
-            const { descripadic, foto, descripcion, stocks } = articulo;
-
-            const card = document.createElement('div');
-            card.id  = 'id'             // ID de tarjeta
-            card.style.width = '200px';
-            card.style.border = '1px solid #ccc';
-            card.style.borderRadius = '8px';
-            card.style.overflow = 'hidden';
-            card.style.boxShadow = '0 2px 5px rgba(0, 0, 0, 0.1)';
-            card.style.display = 'flex';
-            card.style.flexDirection = 'column';
-            card.style.textAlign = 'center';
-            card.style.backgroundColor = '#fff';
-
-            const imgSinFoto = 'http://localhost:5000/default-image';
-            const img = document.createElement('img');
-            img.src = foto || imgSinFoto;
-            img.alt = descripadic || 'Artículo';
-            img.style.width = '100%';
-            img.style.height = '200px';
-            img.style.objectFit = 'contain';
-            img.style.backgroundColor = '#f9f9f9';
-
-            const title = document.createElement('h3');
-            title.textContent = descripadic || 'Sin título';
-            title.style.fontSize = '1rem';
-            title.style.margin = '10px 5px 0';
-
-            const tallaInfo = document.createElement('p');
-            const tallas = (stocks && stocks.length > 0)
-            ? [...new Set(stocks.map(s => s.talla).filter(Boolean))].join(', ')
-            : 'Sin talla';
-
-            tallaInfo.textContent = `Tallas disponibles: ${tallas}`;
-            tallaInfo.style.fontSize = '0.85rem';
-            tallaInfo.style.margin = '5px 10px';
-            tallaInfo.style.color = '#333';
-
-            const desc = document.createElement('p');
-            desc.textContent = descripcion || '';
-            desc.style.fontSize = '0.9rem';
-            desc.style.margin = '5px 10px 10px';
-            desc.style.color = '#555';
-
-            card.appendChild(img);
-            card.appendChild(title);
-            card.appendChild(tallaInfo);
-            card.appendChild(desc);
-            gallery.appendChild(card);
-          });
-
-
-          tableContainer.appendChild(gallery);
-
-        } else {
-          tableContainer.innerHTML = '<div style="text-align: center; padding: 20px; color: red;">No se encontraron artículos para esta temporada</div>';
-        }
-      })
-      .catch(error => {
-        console.error("Error al cargar artículos:", error);
-        tableContainer.innerHTML = `<div style="text-align: center; padding: 20px; color: red;">Error al cargar artículos: ${error.message}</div>`;
-      });
-  }
-
-  cargarPagina(offset);
-});
-
-
-
 
 function cargarResumenFormasPago() {
   const fechaInicio = document.getElementById("fecha-ventas").value;

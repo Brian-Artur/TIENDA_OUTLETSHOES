@@ -1,64 +1,38 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, render_template, send_file
 import pyodbc
 from datetime import datetime
 import io
 from flask_cors import CORS
-import base64
+import os
 
+import base64
 
 app = Flask(__name__)
 
-CORS(app)
+# mi codigo
+CORS(app)  # Esto permite CORS en todas las rutas
 
-# DB_CONFIG = {
-#     "server": "SERVIDOR\\BREOGAN",
-#     "database": "CENTRALBREOGAN",
-#     "username": "sa",
-#     "password": "masterkey",
-#     "driver": "{ODBC Driver 17 for SQL Server}",
-# }
 
+@app.route("/imagen-generica")
+def imagen_generica():
+    ruta = os.path.join(os.path.dirname(__file__), "img", "articulo-sin-foto.jpg")
+    return send_file(ruta, mimetype="image/jpg")
+
+
+""" DB_CONFIG = {
+    'server': 'SERVIDOR\\BREOGAN',
+    'database': 'CENTRALBREOGAN',
+    'username': 'sa',
+    'password': 'masterkey',
+    'driver': '{ODBC Driver 17 for SQL Server}'
+} """
+
+# Conectar a la base de datos local
 DB_CONFIG = {
     "server": "localhost",
     "database": "CENTRALBREOGAN",
-    "username": "sa",
-    "password": "963219",
     "driver": "{ODBC Driver 17 for SQL Server}",
 }
-
-
-# Ruta inicial porque me apetece
-@app.route("/")
-def home():
-    try:
-        conn = get_connection()
-        cursor = conn.cursor()
-
-        query = """
-        SELECT TOP (10) [DESCRIPCION]
-        FROM dbo.ARTICULOS
-        WHERE TEMPORADA = 'V24';
-        """
-        cursor.execute(query)
-
-        # Recoge los resultados en una lista
-        rows = cursor.fetchall()
-        fotos = [row[0] for row in rows]
-
-        cursor.close()
-        conn.close()
-
-        return jsonify({"fotos": fotos})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/default-image")
-def default_image():
-    try:
-        return send_file("public/articulo-sin-foto.jpg", mimetype="image/jpg")
-    except Exception as e:
-        return str(e), 404
 
 
 def get_connection():
@@ -66,9 +40,7 @@ def get_connection():
         f"DRIVER={DB_CONFIG['driver']};"
         f"SERVER={DB_CONFIG['server']};"
         f"DATABASE={DB_CONFIG['database']};"
-        "Trusted_Connection=yes;"
-        # f"UID={DB_CONFIG['username']};"
-        # f"PWD={DB_CONFIG['password']}"
+        f"Trusted_Connection=yes;"
     )
     return pyodbc.connect(conn_str)
 
@@ -1227,108 +1199,92 @@ def get_foto_articulo():
         return jsonify({"error": "Imagen no encontrada"}), 404, cors_headers()
 
 
-def get_articulos_by_season(temporada):
+# Mi codigo
+# Función para obtener imagen según temporada
+def get_image_by_season(referencia):
     conn = get_connection()
     cursor = conn.cursor()
-
     query = """
         SELECT 
-            CODARTICULO, 
-            DESCRIPCION, 
-            DESCRIPADIC, 
-            TEMPORADA, 
-            FOTO, 
-            MARCA 
-        FROM ARTICULOS 
-        WHERE TEMPORADA = ?
-        ORDER BY CODARTICULO;
+            A.CODARTICULO,
+            A.DESCRIPCION,
+            A.DESCRIPADIC,
+            A.FOTO,
+            S.TALLA,
+            S.STOCK
+        FROM dbo.ARTICULOS A
+        JOIN dbo.STOCKS S ON A.CODARTICULO = S.CODARTICULO
+        WHERE A.TEMPORADA = ? AND S.STOCK > 0
     """
-
-    cursor.execute(query, (temporada))
+    cursor.execute(query, (referencia,))
     rows = cursor.fetchall()
-    conn.close()
 
-    articulos = []
-    for row in rows:
-        codarticulo, descripcion, descripadic, temporada, foto, marca = row
+    # lista para guardar las imagenes transformadas
+    imagenes = []
+    if rows:
+        for cod, desc, descadic, foto, talla, stock in rows:
+            # Convertimos FOTO (bytes) a base64
+            foto_b64 = base64.b64encode(foto).decode("utf-8") if foto else None
+            imagenes.append(
+                {
+                    "codarticulo": cod,
+                    "descripcion": desc,
+                    "descripcionadic": descadic,
+                    "foto": foto_b64,
+                    "talla": talla,
+                    "stock": stock,
+                }
+            )
 
-        # Codifica la imagen
-        if foto:
-            imagen_base64 = base64.b64encode(foto).decode("utf-8")
-            foto_data = f"data:image/jpeg;base64,{imagen_base64}"
-        else:
-            foto_data = None
-
-        # Consulta de stocks asociados
-        stocks = get_stocks_by_codarticulo(codarticulo)
-
-        articulos.append(
-            {
-                "codarticulo": codarticulo,
-                "descripcion": descripcion,
-                "descripadic": descripadic,
-                "temporada": temporada,
-                "foto": foto_data,
-                "marca": marca,
-                "stocks": stocks,
-            }
-        )
-
-    return articulos
+        return imagenes
 
 
-@app.route("/articulos-temporada", methods=["GET", "OPTIONS"])
-def get_articulos_por_temporada():
+# Ruta para obtener catalago imagenes
+@app.route("/catalogo-temporada", methods=["GET", "OPTIONS"])
+def get_catalogo_temporada():
     if request.method == "OPTIONS":
         return "", 200, cors_headers()
 
-    try:
-        temporada = request.args.get("temporada")
-        offset = int(request.args.get("offset", 0))  # por defecto empieza en 0
+    referencia = request.args.get("referencia")
+    if not referencia:
+        return jsonify({"error": "Falta el código de 'temporada'"}), 400, cors_headers()
 
-        if not temporada:
-            return (
-                jsonify({"error": "Falta el parámetro 'temporada'"}),
-                400,
-                cors_headers(),
-            )
+    image_data = get_image_by_season(referencia)
 
-        articulos = get_articulos_by_season(temporada)
-
-        return jsonify({"articulos": articulos}), 200, cors_headers()
-
-    except Exception as e:
-        print(f"❌ Error en /articulos-temporada: {str(e)}")
+    if image_data:
         return (
-            jsonify({"message": "Error al obtener artículos", "error": str(e)}),
-            500,
+            jsonify(
+                {
+                    "message": f"{len(image_data)} artículos encontrados",
+                    "data": image_data,
+                }
+            ),
+            200,
             cors_headers(),
         )
+    else:
+        return jsonify({"error": "No se encontraron artículos"}), 404, cors_headers()
 
 
-def get_stocks_by_codarticulo(codarticulo):
-    conn = get_connection()
-    cursor = conn.cursor()
+# ruta prueba index
+@app.route("/")
+def index():
+    temporada = "V22"
+    imagenes = get_image_by_season(temporada)
 
-    query = """
-        SELECT 
-            TALLA,
-            CODALMACEN
-        FROM STOCKS
-        WHERE CODARTICULO = ? AND STOCK <> 0
-        ORDER BY TALLA, CODALMACEN;
-    """
+    if imagenes:
+        data = []
+        for img in imagenes:
+            img.seek(0)
+            encoded = base64.b64encode(img.read()).decode("utf-8")
+            data.append({"imagen": encoded})
+    else:
+        data = []
 
-    cursor.execute(query, (codarticulo,))
-    rows = cursor.fetchall()
-    conn.close()
+    return render_template("indexPrueba.html", data=data)
 
-    stocks = []
-    for row in rows:
-        talla, codalmacen = row
-        stocks.append({"talla": talla, "codalmacen": codalmacen})
 
-    return stocks
+# Fin mi codigo
 
 
 @app.route("/formas-pago/resumen", methods=["GET", "OPTIONS"])
