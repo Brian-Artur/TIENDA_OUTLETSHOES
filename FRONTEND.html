@@ -1736,7 +1736,7 @@ document.getElementById("btn-catalog").addEventListener("click", async () => {
 
         //creamos el html llamando a la función para renderizar el catálogo
         tableContainer.innerHTML = `
-            <h2> Catálogo de imagenes</h2>
+            <h2 id="title-catalogo"> Catálogo de imagenes ${referencia}</h2>
             ${renderCatalogo(result.data)}
         `
     }catch(error){
@@ -1792,19 +1792,26 @@ articulosMap.forEach((articulo, cod) => {
             background: #fff;
             border-radius: 12px;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            padding: 15px;
+            padding: 5px;
             text-align: center;
             transition: transform 0.2s;
+            width: 250px;
+            overflow: hidden;
         "
-        onmouseover="this.style.transform='scale(1.02)'"
+        onmouseover="this.style.transform='scale(1.1)'"
         onmouseout="this.style.transform='scale(1)'"
         >
             <img src="${imagenSrc}" 
-                 alt="Imagen del artículo" 
-                 style="width: 100%; height: auto; border-radius: 8px; object-fit: cover; max-height: 200px;">
+              alt="Imagen del artículo" 
+              style="
+                width: 100%; 
+                height: 200px; 
+                border-radius: 8px; 
+                object-fit: cover; 
+                max-height: 200px;">
             
-            <h3 style="margin: 10px 0 5px;">${articulo.descripcion}</h3>
-            <p style="color: #666; font-size: 0.9em;">Código: <strong>${articulo.descripcionadic}</strong></p>
+            <h3 style="margin: 10px 0 5px;">${articulo.descripcionadic}</h3>
+            <p style="color: #666; font-size: 0.9em;">${articulo.descripcion}</p>
             <div style="margin-top: 10px;">
                 <span style="font-weight: bold;">Tallas disponibles:</span><br>
                 <span style="display: inline-block; margin-top: 5px; color: #444;">
@@ -1818,439 +1825,206 @@ articulosMap.forEach((articulo, cod) => {
     return html;
 }
 
-/* function renderCatalogo(data) {
-    //Comprobamos que sea un array y no venga vacio
-    //if (!Array.isArray(data) || data.length === 0) return "<p>Sin datos</p>";
 
-    //creamos el html, recorremos la data para extraer cada imagen
-    let html = `<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">`;
-    data.forEach((img, index) =>{
-        html += `<img src="data:image/jpeg;base64,${img.imagen}" width="200">`
+// Se añade un listener al botón con id "btn-export-pdf"
+async function generarPDF() {
+  try{
+    /**
+    *? Destructurar el objeto "window.jspdf". Pues jspdf.umd.min.js no deja 
+		*? la clase jsPDF directamente en window, sino que deja un objeto llamado 
+		*? window.jspdf */ 
+    const { jsPDF } = window.jspdf;
+		// Crea nuevo documento PDF en A4 vertical("p")
+    const doc = new jsPDF("p", "mm", "a4");
+		// Obtener el contenedor #galeria
+    const catalogoElement = document.getElementById("galeria");
+    if (!catalogoElement) {
+        alert("No hay catálogo cargado.");
+        return;
     }
-    );      
-    //cerramos html y lo retornamos
-    html += `</div>`
+
+		// Obtener todas las tarjetas y las guarda en un NodeList == Array
+    const cards = catalogoElement.querySelectorAll(".card");
+		const title = document.getElementById("title-catalogo")
     
-    return html;
-} */
-
-//función para exportat catálogo. Version con pdf canvas creando bien el pdf
-/* document.getElementById("btn-export-pdf").addEventListener("click", async () => {
-    const contenedor = document.getElementById("table-container");
-
-    // Espera a que las imágenes se carguen
-    await esperarImagenesCargadas(contenedor);
-    console.log("Todas las imágenes cargadas");
-
-    html2canvas(contenedor, {
-        scale: 2,
-        useCORS: true
-    }).then(canvas => {
-        const imgData = canvas.toDataURL("image/jpeg", 1.0);
-
-        if (!imgData.startsWith("data:image")) {
-            alert("No se pudo generar la imagen del catálogo.");
-            return;
-        }
-
-        const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF("p", "mm", "a4");
-
-        const pageWidth = pdf.internal.pageSize.getWidth();
-        const pageHeight = pdf.internal.pageSize.getHeight();
-
-        const imgWidth = pageWidth - 20; // márgenes laterales
-        const imgProps = pdf.getImageProperties(imgData);
-        const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
-
-        const canvasHeight = canvas.height;
-        const canvasWidth = canvas.width;
-
-        const pageHeightPx = (pageHeight * canvasWidth) / imgWidth; // Alto en px del canvas por página
-
-        let position = 0;
-
-        while (position < canvasHeight) {
-            const pageCanvas = document.createElement("canvas");
-            pageCanvas.width = canvasWidth;
-            pageCanvas.height = Math.min(pageHeightPx, canvasHeight - position);
-
-            const ctx = pageCanvas.getContext("2d");
-            ctx.drawImage(
-                canvas,
-                0, position,
-                canvasWidth, pageCanvas.height,
-                0, 0,
-                canvasWidth, pageCanvas.height
-            );
-
-            const pageImgData = pageCanvas.toDataURL("image/jpeg", 1.0);
-
-            if (position > 0) pdf.addPage();
-            pdf.addImage(pageImgData, "JPEG", 10, 10, imgWidth, (pageCanvas.height * imgWidth) / canvasWidth);
-
-            position += pageHeightPx;
-        }
-
-        pdf.save("catalogo.pdf");
-    }).catch(err => {
-        console.error("Error generando el PDF:", err);
-    });
-});
- */
-//Pruebas de la funciones de arriba modificadas para usar jspdf
-/* document.getElementById("btn-export-pdf").addEventListener("click", async () => {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
-
-    const contenedor = document.getElementById("table-container");
-    if (!contenedor) {
-        alert("No hay contenido para exportar.");
-        return;
-    }
-
-    await esperarImagenesCargadas(contenedor);
-    console.log("Imágenes cargadas correctamente");
-
-    html2canvas(contenedor, {
-        scale: 2,
-        useCORS: true
-    }).then(canvas => {
-        const imgData = canvas.toDataURL("image/jpeg", 1.0);
-
-        if (!imgData.startsWith("data:image")) {
-            alert("No se pudo generar la imagen del catálogo.");
-            return;
-        }
-
-        const pageWidth = doc.internal.pageSize.getWidth();
-        const pageHeight = doc.internal.pageSize.getHeight();
-
-        const imgProps = doc.getImageProperties(imgData);
-        const imgWidth = pageWidth - 80; // márgenes laterales (pt)
-        const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
-
-        const canvasWidth = canvas.width;
-        const canvasHeight = canvas.height;
-        const pageHeightPx = (pageHeight * canvasWidth) / imgWidth;
-
-        let position = 0;
-        let pagina = 1;
-
-        while (position < canvasHeight) {
-            if (pagina > 1) doc.addPage();
-
-            // Encabezado solo en la primera página (puedes repetirlo si quieres en todas)
-            if (pagina === 1) {
-                doc.setFont("helvetica", "bold");
-                doc.setFontSize(14);
-                doc.setTextColor(40);
-                doc.text("CATÁLOGO DE TEMPORADA - OUTLETSHOES", 40, 40);
-
-                const fecha = new Date().toLocaleDateString();
-                doc.setFont("helvetica", "normal");
-                doc.setFontSize(10);
-                doc.text(`Fecha de generación: ${fecha}`, 40, 60);
-            }
-
-            const pageCanvas = document.createElement("canvas");
-            pageCanvas.width = canvasWidth;
-            pageCanvas.height = Math.min(pageHeightPx, canvasHeight - position);
-
-            const ctx = pageCanvas.getContext("2d");
-            ctx.drawImage(
-                canvas,
-                0, position,
-                canvasWidth, pageCanvas.height,
-                0, 0,
-                canvasWidth, pageCanvas.height
-            );
-
-            const pageImgData = pageCanvas.toDataURL("image/jpeg", 1.0);
-            doc.addImage(pageImgData, "JPEG", 40, 80, imgWidth, (pageCanvas.height * imgWidth) / canvasWidth);
-
-            position += pageHeightPx;
-            pagina++;
-        }
-
-        doc.save("catalogo-temporada.pdf");
-    }).catch(err => {
-        console.error("Error generando el catálogo PDF:", err);
-        alert("Ocurrió un error al generar el catálogo.");
-    });
-}); */
-//Prueba de funcion usando solo jspdf y sin recibir imagen generica desde el back ya que jspdf no usa cors
-/* document.getElementById("btn-export-pdf").addEventListener("click", async () => {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF("p", "mm", "a4");
-
-    const catalogoElement = document.getElementById("galeria");
-    if (!catalogoElement) {
-        alert("No hay catálogo cargado.");
-        return;
-    }
-
-    const cards = catalogoElement.querySelectorAll("div");
-
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 10;
-    const cardWidth = 80;
-    const cardHeight = 100;
-    const spaceX = 10;
-    const spaceY = 20;
-
-    let x = margin;
-    let y = margin;
-
-    for (const card of cards) {
-        const imgEl = card.querySelector("img");
-        const h3 = card.querySelector("h3");
-        const desc = h3?.textContent.trim() || "";
-        const cod = card.querySelector("p")?.textContent.trim() || "";
-        const tallas = card.querySelector("span:last-of-type")?.textContent.trim() || "";
-
-        const imgSrc = imgEl?.src || "";
-
-        // Si no es base64 o es una imagen externa, la tratamos como genérica
-        const isBase64 = imgSrc.startsWith("data:image");
-        const finalImage = isBase64 ? imgSrc : "http://localhost:5000/imagen-generica";
-
-        // Cargar imagen como base64 (si es externa)
-        let base64Image = finalImage;
-        if (!isBase64) {
-            base64Image = await toDataUrl(finalImage);
-        }
-
-        // Añadir nueva página si no cabe
-        if (x + cardWidth > pageWidth - margin) {
-            x = margin;
-            y += cardHeight + spaceY;
-        }
-        if (y + cardHeight > pageHeight - margin) {
-            doc.addPage();
-            x = margin;
-            y = margin;
-        }
-
-        doc.addImage(base64Image, "JPEG", x, y, cardWidth, 50);
-        doc.setFontSize(9);
-        doc.text(desc, x, y + 55, { maxWidth: cardWidth });
-        doc.text(cod, x, y + 65, { maxWidth: cardWidth });
-        doc.text("Tallas: " + tallas, x, y + 75, { maxWidth: cardWidth });
-
-        x += cardWidth + spaceX;
-    }
-
-    doc.save("catalogo_productos.pdf");
-}); */
-
-
-/**
- * !! Función para e
-//prueba funcion modificada justo la de arriba para que genere un pdf con mas productos
-document.getElementById("btn-export-pdf").addEventListener("click", async () => {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF("p", "mm", "a4");
-
-    const catalogoElement = document.getElementById("galeria");
-    if (!catalogoElement) {
-        alert("No hay catálogo cargado.");
-        return;
-    }
-
-    const cards = catalogoElement.querySelectorAll(".card");
-
+		// Configurar dimensiones y layout
     const pageWidth = doc.internal.pageSize.getWidth(); // 210 mm
     const pageHeight = doc.internal.pageSize.getHeight(); // 297 mm
+    /**
+     *! Límites de la página */
     const margin = 5;
-
-    const cols = 4; // columnas por fila
-    const rows = 4; // filas por página
-    const cardWidth = (pageWidth - margin * 2 - (cols - 1) * 5) / cols;
-    const cardHeight = (pageHeight - margin * 2 - (rows - 1) * 10) / rows;
-
-    let x = margin;
-    let y = margin;
-    let col = 0;
-    let row = 0;
-
-    for (const card of cards) {
-        const imgEl = card.querySelector("img");
-        const h3 = card.querySelector("h3");
-        const desc = h3?.textContent.trim() || "";
-        const cod = card.querySelector("p")?.textContent.trim() || "";
-        const tallas = card.querySelector("span:last-of-type")?.textContent.trim() || "";
-
-        const imgSrc = imgEl?.src || "";
-        const isBase64 = imgSrc.startsWith("data:image");
-        const finalImage = isBase64 ? imgSrc : "http://localhost:5000/imagen-generica";
-
-        let base64Image = finalImage;
-        if (!isBase64) {
-            base64Image = await toDataUrl(finalImage);
-        }
-
-        // Imagen centrada en el espacio del card
-        const imgHeight = cardHeight * 0.5;
-        doc.addImage(base64Image, "JPEG", x, y, cardWidth, imgHeight);
-
-        doc.setFontSize(7);
-        doc.text(desc, x, y + imgHeight + 5, { maxWidth: cardWidth });
-        doc.text(cod, x, y + imgHeight + 12, { maxWidth: cardWidth });
-        doc.text("Tallas: " + tallas, x, y + imgHeight + 19, { maxWidth: cardWidth });
-
-        col++;
-        if (col >= cols) {
-            col = 0;
-            row++;
-            x = margin;
-            y += cardHeight + 10;
-        } else {
-            x += cardWidth + 5;
-        }
-
-        if (row >= rows) {
-            doc.addPage();
-            row = 0;
-            x = margin;
-            y = margin;
-        }
-    }
-
-    doc.save("catalogo_productos.pdf");
-});
-*/
-
-document.getElementById("btn-export-pdf").addEventListener("click", async () => {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF("p", "mm", "a4");
-
-    const catalogoElement = document.getElementById("galeria");
-    if (!catalogoElement) {
-        alert("No hay catálogo cargado.");
-        return;
-    }
-
-    const cards = catalogoElement.querySelectorAll(".card");
-
-    const pageWidth = doc.internal.pageSize.getWidth(); // 210 mm
-    const pageHeight = doc.internal.pageSize.getHeight(); // 297 mm
-    const margin = 5;
-
     const cols = 4; // columnas por fila
     const rows = 4; // filas por página
 
+		/**
+		 *^ Se calculan las dimensiones de cada tarjeta, teniendo en cuenta 
+		 *^ márgenes y espaciado interno entre tarjetas
+		*/																						// 5 = Margen entre columnas
     const cardWidth = (pageWidth - margin * 2 - (cols - 1) * 5) / cols;
     const cardHeight = (pageHeight - margin * 2 - (rows - 1) * 10) / rows;
-
-    let x = margin;
-    let y = margin;
+																										// 10 = Margen entre filas
+    // Variables de posición y contador
+		let x = margin;		// 5mm
+    let y = margin;   // 5mm
     let col = 0;
     let row = 0;
+    let padding = 0.5;
+    // Pie de página
+    let count = 1;
 
+		// Fecha actual, formato de España
     const fecha = new Date().toLocaleDateString("es-ES");
 
     // Añadir encabezado SOLO en la primera página
     doc.setFontSize(16);
-    doc.text("Catálogo de imágenes", margin, 12);
+    doc.text(title.innerText, margin, 12);
     doc.setFontSize(10);
     doc.text(`Fecha: ${fecha}`, margin, 18);
 
     // Ajustar margen superior de la primera página
-    y = 25;
+    y = 20;
 
+	  /**
+     *^ Se recorre cada una de las tarjetas HTML seleccionadas antes. */
     for (let i = 0; i < cards.length; i++) {
-        const card = cards[i];
+      // Una tarjeta en el orden del NodeList de tarjetas
+      const card = cards[i];
+      // Subelementos de cada tarjeta
+      const imgEl = card.querySelector("img");
+      const h3 = card.querySelector("h3");
 
-        const imgEl = card.querySelector("img");
-        const h3 = card.querySelector("h3");
-        const desc = h3?.textContent.trim() || "";
-        const cod = card.querySelector("p")?.textContent.trim() || "";
-        const tallas = card.querySelector("span:last-of-type")?.textContent.trim() || "";
+      /**
+       *? Si h3 es null o undefined, no lanza un error, simplemente 
+          *? devuelve undefined. */
+      const cod = h3?.textContent.trim() || ""; // .trim() quita espacios
+      const desc = card.querySelector("p")?.textContent.trim() || "";
+      const tallas = card.querySelector("span:last-of-type")?.textContent.trim() || "";
 
-        const imgSrc = imgEl?.src || "";
-        const isBase64 = imgSrc.startsWith("data:image");
-        const finalImage = isBase64 ? imgSrc : "http://localhost:5000/imagen-generica";
+      // Procesar imagen
+      const imgSrc = imgEl?.src || "";
+      // Comprueba si la foto está en data:image/jpeg;base64,/9j/4AAQSkZ...
+      const isBase64 = imgSrc.startsWith("data:image");
+      const finalImage = isBase64 ? imgSrc : "http://localhost:5000/imagen-generica";
 
-        let base64Image = finalImage;
-        if (!isBase64) {
-            base64Image = await toDataUrl(finalImage);
+      let base64Image = finalImage;
+      if (!isBase64) {
+        base64Image = await toDataUrl(finalImage);
+      }
+
+
+      /**
+       *? Se inserta la imagen en la posición actual (x, y) ocupando 
+        *? la mitad superior del espacio del card. */
+        const imgHeight = cardHeight * 0.6;
+      doc.addImage(
+        base64Image, 
+        "JPEG", 
+        x + padding, 
+        y + padding, 
+        cardWidth - (padding * 2), 
+        imgHeight - padding
+      );
+
+      // Borde con esquinas redondeadas
+      doc.setDrawColor(255, 255, 255);
+      doc.setLineWidth(1.5);
+      doc.roundedRect(x, y, cardWidth, cardHeight, 2.5, 2.5, 'S');
+
+      doc.setDrawColor(237, 232, 228);
+      doc.setLineWidth(0.5);
+      doc.roundedRect(x, y, cardWidth, cardHeight, 2.5, 2.5, 'S');
+
+      
+      /**
+       *~ Se añaden tres líneas de texto debajo de la imagen 
+        *~ con espaciado vertical entre ellas. */
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold")
+      doc.text(
+        cod, 
+        x + (padding * 3), 
+        y + imgHeight + 5, 
+        { 
+          maxWidth: cardWidth - (padding * 6),
         }
-
-        // Imagen en la mitad superior del card
-        const imgHeight = cardHeight * 0.5;
-        doc.addImage(base64Image, "JPEG", x, y, cardWidth, imgHeight);
-
-        doc.setFontSize(7);
-        doc.text(desc, x, y + imgHeight + 5, { maxWidth: cardWidth });
-        doc.text(cod, x, y + imgHeight + 12, { maxWidth: cardWidth });
-        doc.text("Tallas: " + tallas, x, y + imgHeight + 19, { maxWidth: cardWidth });
-
-        col++;
-        if (col >= cols) {
-            col = 0;
-            row++;
-            x = margin;
-            y += cardHeight + 3;
-        } else {
-            x += cardWidth + 5;
-        }
-
-        // Si ya se llenó la página
-        if (row >= rows && i < cards.length - 1) {
-            doc.addPage();
-            row = 0;
-            col = 0;
-            x = margin;
-            y = margin;
-        }
+      );
+      doc.setFontSize(7);
+      doc.setFont("helvetica", "normal");
+      doc.text(desc, x + (padding * 3), y + imgHeight + 12, { maxWidth: cardWidth - (padding * 6) });
+      doc.text("Tallas: " + tallas, x + (padding * 3), y + imgHeight + 19, { maxWidth: cardWidth - (padding * 6) });
+      /**
+       ** Se avanza a la siguiente columna.
+        ** Si ya se completó una fila (col >= cols), se reinicia la columna 
+        ** y se baja una fila (row++). */
+      col++;
+      if (col >= cols) {
+        col = 0;
+        row++;
+        x = margin;
+        y += cardHeight + 3;
+      } else {
+        x += cardWidth + 5;
+      }
+      /**
+       *^ Si ya se colocaron todas las filas posibles (16 tarjetas) y aún 
+        *^ hay más tarjetas, se añade una nueva página. La posición se 
+        *^ reinicia arriba (y = margin) porque solo la primera página tiene 
+        *^ encabezado. */
+      if (row >= rows && i < cards.length - 1) {
+        doc.text(
+          "Página " + count, 
+          pageWidth - (margin * 3), 
+          pageHeight - (margin * 1.2), 
+          { maxWidth: cardWidth - (padding * 6) }
+        );
+        doc.addPage();
+        row = 0;
+        col = 0;
+        x = margin;
+        y = margin;
+        count++;
+      }
     }
 
     doc.save("catalogo_productos.pdf");
+
+  } catch (error) {
+    console.error("Error al generar PDF:", error);
+  }
+};
+
+// 2. Delegación de eventos
+tableContainer.addEventListener('click', function(e) {
+    if (e.target && e.target.id === 'btn-export-pdf') {
+        generarPDF();
+    }
 });
 
 // Utilidad: convierte imagen externa a base64
 async function toDataUrl(url) {
     const res = await fetch(url);
+    /** 
+     * Convierte la respuesta en un Blob, es decir, en un archivo binario 
+     * en memoria, que representa los datos de la imagen. */
     const blob = await res.blob();
     return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result);
-        reader.readAsDataURL(blob);
+      /**
+       * Instanciar FileReader, que se encarga de leer archivos (como Blob) 
+       * y convertirlos a texto o base64.*/
+      const reader = new FileReader();
+      // 2. Cuando termine de leer (pasar a base64)
+      reader.onloadend = () => {
+        // Devuleve el resultado de la lectura a la Promise
+        return resolve(reader.result);
+      }
+      // 1. Bianrio lo pasamos a base64
+      reader.readAsDataURL(blob);
     });
 }
 
 
 
 
-async function toDataUrl(url) {
-    const res = await fetch(url);
-    const blob = await res.blob();
-    return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result);
-        reader.readAsDataURL(blob);
-    });
-}
-
-
-
-
-/* //funcion para esperar imgenes del contenedor
-function esperarImagenesCargadas(contenedor) {
-    const imagenes = contenedor.querySelectorAll("img");
-    const promesas = Array.from(imagenes).map(img => {
-        if (img.complete) return Promise.resolve();
-        return new Promise(resolve => {
-            img.onload = img.onerror = resolve;
-        });
-    });
-    return Promise.all(promesas);
-} */
-
-
-// Fin mi codigo
 
 function renderMiniTable(data, tipo = "") {
     if (!Array.isArray(data) || data.length === 0) return "<p>Sin datos</p>";

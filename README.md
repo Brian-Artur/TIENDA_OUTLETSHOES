@@ -1,6 +1,6 @@
 # Procedimiento
 
-1. Entorno virtual:
+### 1. Entorno virtual:
 
 ```bash
 python -m venv .venv
@@ -9,8 +9,9 @@ pip install
 pip freeze > requirements.txt
 ```
 
-2. Ejecutar tu backend
+### 2. Ejecutar tu backend
 
 ```bash
+source .venv/Scripts/activate
 python BACKEND.py
 ```
