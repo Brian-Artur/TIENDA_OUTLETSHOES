@@ -151,6 +151,10 @@
       }
 
       async function exportarTablaAPDF() {
+        if (!window.jspdf || !window.jspdf.jsPDF) {
+          alert("La librería jsPDF no está cargada correctamente.");
+          return;
+        }
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF({
           orientation: "landscape",
@@ -334,7 +338,7 @@
               class="benefits-button"
               style="background-color: #9f66ad"
             >
-              Catálgo</button
+              Catálogo</button
             ><!-- Mi codigo -->
             <!-- Mi codigo -->
 
@@ -353,15 +357,15 @@
               width: 100%;
             "
           >
-            <button class="btns-bot" onclick="imprimirTicket()">
+            <!-- <button class="btn-bot" onclick="imprimirTicket()">
               Imprimir Artículos Vendidos
             </button>
-            <button class="btns-bot" onclick="exportarTablaAExcel()">
+            <button class="btn-bot" onclick="exportarTablaAExcel()">
               Exportar a Excel
             </button>
-            <button class="btns-bot" onclick="exportarTablaAPDF()">
+            <button class="btn-bot" onclick="exportarTablaAPDF()">
               Exportar a PDF
-            </button>
+            </button> -->
           </div>
         </div>
       </div>
@@ -402,6 +406,36 @@
         });
         return Promise.all(promesas);
       }
+
+      function generarBotonesAcciones() {
+  const contenedor = document.getElementById("gr-btns-bot");
+
+  // Si ya están generados, no los duplicamos
+  if (contenedor.querySelector(".btn-bot")) return;
+
+  // Crear botón Imprimir
+  const btnImprimir = document.createElement("button");
+  btnImprimir.textContent = "Imprimir Artículos Vendidos";
+  btnImprimir.className = "btn-bot";
+  btnImprimir.onclick = imprimirTicket;
+
+  // Crear botón Exportar a Excel
+  const btnExcel = document.createElement("button");
+  btnExcel.textContent = "Exportar a Excel";
+  btnExcel.className = "btn-bot";
+  btnExcel.onclick = exportarTablaAExcel;
+
+  // Crear botón Exportar a PDF
+  const btnPDF = document.createElement("button");
+  btnPDF.textContent = "Exportar a PDF";
+  btnPDF.className = "btn-bot";
+  btnPDF.onclick = exportarTablaAPDF;
+
+  // Agregar botones al contenedor
+  contenedor.appendChild(btnImprimir);
+  contenedor.appendChild(btnExcel);
+  contenedor.appendChild(btnPDF);
+}
 
       /*
         // Función para obtener ventas realizadas
@@ -471,6 +505,12 @@
             tableContainer.innerHTML =
               '<p class="error">No "data" field found in the response or data is not an array.</p>';
           }
+
+          // Generar botones de exportación si no existe.
+          generarBotonesAcciones()
+
+          const exportBtn = document.getElementById("btn-export-pdf");
+          if (exportBtn) exportBtn.remove(); // 👈 elimina el botón después de generar el PDF
         } catch (error) {
           tableContainer.innerHTML = `<p class="error">Error fetching data: ${error.message}</p>`;
         }
@@ -1677,7 +1717,7 @@
       async function generateHistoricoStock() {
         const referencia = prompt(
           "Introduce la referencia o código de barras del artículo:"
-        );
+        ).toUpperCase();
         if (!referencia || referencia.trim() === "") {
           tableContainer.innerHTML =
             '<p class="error">Operación cancelada. No se proporcionó una referencia.</p>';
@@ -1709,6 +1749,12 @@
             tableContainer.innerHTML =
               '<p class="error">No se encontraron datos para esa referencia.</p>';
           }
+
+          // Generar botones de exportación si no existe.
+          generarBotonesAcciones()
+
+          const exportBtn = document.getElementById("btn-export-pdf");
+          if (exportBtn) exportBtn.remove(); // 👈 elimina el botón después de generar el PDF
         } catch (error) {
           tableContainer.innerHTML = `<p class="error">Error: ${error.message}</p>`;
         }
@@ -1897,7 +1943,7 @@
         .addEventListener("click", async () => {
           const referencia = prompt(
             "Introduce la referencia o código de barras del artículo:"
-          );
+          ).toUpperCase();
           if (!referencia || referencia.trim() === "") {
             tableContainer.innerHTML =
               '<p class="error">Consulta cancelada. No se proporcionó una referencia.</p>';
@@ -1922,6 +1968,12 @@
             <h2>Histórico de Ventas</h2>
             ${renderMiniTable(result.historico, "ventas")}
         `;
+
+        // Generar botones de exportación si no existe.
+        generarBotonesAcciones()
+
+        const exportBtn = document.getElementById("btn-export-pdf");
+        if (exportBtn) exportBtn.remove(); // 👈 elimina el botón después de generar el PDF
           } catch (error) {
             tableContainer.innerHTML = `<p class="error">Error: ${error.message}</p>`;
           }
@@ -1987,6 +2039,11 @@
         // Si ya existe el modal, no lo volvemos a crear
         if (document.getElementById("catalog-modal")) return;
 
+        const contenedor = document.getElementById("gr-btns-bot");
+        const btnsExport = document.querySelectorAll(".btn-bot");
+        contenedor.innerHTML = "";
+
+
         // Crear modal contenedor
         const modal = document.createElement("div");
         modal.id = "catalog-modal";
@@ -2048,6 +2105,22 @@
         <h2 id="title-catalogo">Catálogo por ${etiqueta}: ${campo}</h2>
         ${renderCatalogo(result.data)}
       `;
+
+      // MOVER ESTE BLOQUE AQUÍ, DESPUÉS DE RENDERIZAR
+const grBtnBot = document.getElementById("gr-btns-bot");
+const existingBtn = document.getElementById("btn-export-pdf");
+if (existingBtn) existingBtn.remove();
+
+const exportBtn = document.createElement("button");
+exportBtn.id = "btn-export-pdf";
+exportBtn.textContent = "Exportar catálogo";
+
+
+grBtnBot.appendChild(exportBtn);
+
+exportBtn.addEventListener("click", generarPDF);
+
+
           } catch (err) {
             tableContainer.innerHTML = `<p class="error">Error: ${err.message}</p>`;
           } finally {
@@ -2091,11 +2164,10 @@
           articulosMap.get(cod).tallas.add(item.talla);
         });
 
-        const grBtnBot = document.getElementById("gr-btns-bot");
+
 
         // Render catálogo como tabla visual
         let html = `
-            <button style="background-color: #9f66ad" id="btn-export-pdf">Exportar catálogo</button>
             <div id="galeria" style="
                 display: grid;
                 grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -2316,12 +2388,9 @@
         }
       }
 
-      // 2. Delegación de eventos
-      tableContainer.addEventListener("click", function (e) {
-        if (e.target && e.target.id === "btn-export-pdf") {
-          generarPDF();
-        }
-      });
+
+
+
 
       // Utilidad: convierte imagen externa a base64
       async function toDataUrl(url) {
