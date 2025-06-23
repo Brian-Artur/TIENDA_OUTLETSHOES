@@ -1285,6 +1285,75 @@ def get_catalogo_temporada():
         return jsonify({"error": "No se encontraron artículos"}), 404, cors_headers()
 
 
+@app.route("/catalogo-proveedor", methods=["GET", "OPTIONS"])
+def get_catalogo_proveedor():
+    if request.method == "OPTIONS":
+        return "", 200, cors_headers()
+
+    proveedor = request.args.get("proveedor")
+    if not proveedor:
+        return jsonify({"error": "Falta el código de 'proveedor'"}), 400, cors_headers()
+
+    image_data = get_images_by_supplier(proveedor)
+
+    if image_data:
+        return (
+            jsonify(
+                {
+                    "message": f"{len(image_data)} artículos encontrados",
+                    "data": image_data,
+                }
+            ),
+            200,
+            cors_headers(),
+        )
+    else:
+        return jsonify({"error": "No se encontraron artículos"}), 404, cors_headers()
+
+
+def get_images_by_supplier(proveedor):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    query = """
+        SELECT 
+            A.CODARTICULO,
+            A.DESCRIPCION,
+            A.DESCRIPADIC,
+            A.FOTO,
+            S.TALLA,
+            S.STOCK
+        FROM dbo.ARTICULOS A
+        JOIN dbo.STOCKS S ON A.CODARTICULO = S.CODARTICULO
+        WHERE 
+            S.STOCK > 0
+            AND (
+                LEFT(A.DESCRIPADIC, 3) COLLATE Modern_Spanish_CI_AS = ?
+                OR LEFT(A.REFPROVEEDOR, 3) COLLATE Modern_Spanish_CI_AS = ?
+            )
+    """
+    cursor.execute(query, (proveedor, proveedor))
+    rows = cursor.fetchall()
+
+    imagenes = []
+    if rows:
+        for cod, desc, descadic, foto, talla, stock in rows:
+            foto_b64 = base64.b64encode(foto).decode("utf-8") if foto else None
+            imagenes.append(
+                {
+                    "codarticulo": cod,
+                    "descripcion": desc,
+                    "descripcionadic": descadic,
+                    "foto": foto_b64,
+                    "talla": talla,
+                    "stock": stock,
+                }
+            )
+
+    return imagenes
+
+
+
 # ruta prueba index
 @app.route("/")
 def index():
