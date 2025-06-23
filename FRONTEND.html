@@ -252,7 +252,7 @@ async function exportarTablaAPDF() {
                     <button id="btn-consulta" class="benefits-button" style="background-color: orange;">Consulta</button>
                     <button id="fetch-report" class="report-button">Existencias</button>
                     <button id="btn-historico" class="benefits-button">Histórico</button>
-                    <button id="btn-catalog" class="benefits-button">Catálgo temporada</button><!-- Mi codigo -->
+                    <button id="btn-catalog" class="benefits-button" style="background-color: #9f66ad;">Catálgo temporada</button><!-- Mi codigo -->
                     <!-- Mi codigo -->
 
                     <!--<button id="btn-beneficios" class="benefits-button" style="background-color: #444;">Informe por Proveedores</button>-->
@@ -261,10 +261,11 @@ async function exportarTablaAPDF() {
                 </div>
 
                 <!-- Botones de exportación en una línea nueva -->
-                <div style="display: flex; justify-content: flex-end; gap: 10px; width: 100%;">
-                    <button onclick="imprimirTicket()">Imprimir Artículos Vendidos</button>
-                    <button onclick="exportarTablaAExcel()">Exportar a Excel</button>
-                    <button onclick="exportarTablaAPDF()">Exportar a PDF</button>
+                <div id="gr-btns-bot" style="display: flex; justify-content: flex-end; gap: 10px; width: 100%;">
+                    <button class="btns-bot" onclick="imprimirTicket()">Imprimir Artículos Vendidos</button>
+                    <button class="btns-bot" onclick="exportarTablaAExcel()">Exportar a Excel</button>
+                    <button class="btns-bot" onclick="exportarTablaAPDF()">Exportar a PDF</button>
+                    
                 </div>
             </div>
         </div>
@@ -280,12 +281,14 @@ async function exportarTablaAPDF() {
         const specificApiUrlHistorico = "https://abincodigital.loclx.io/historico"; 
         const specificApiUrlExistencias = "https://abincodigital.loclx.io/existencias";
         const specificApiUrlHistoricoStocks = "https://abincodigital.loclx.io/historico-stocks";
+        // No se utiliza
         const specificApiUrlConsulta = "https://abincodigital.loclx.io/consulta";
 
         // Elementos del DOM
         const fetchButton = document.getElementById('fetch-json');
         const reportButton = document.getElementById('fetch-report');
         const tableContainer = document.getElementById('table-container');
+        // No se utiliza
         const catalogbutton = document.getElementById('btn-catalog');//Mi codigo
 
     //funcion para esperar imgenes del contenedor //Mi codigo
@@ -300,7 +303,7 @@ async function exportarTablaAPDF() {
     return Promise.all(promesas);
     }
 
-
+    /*
         // Función para obtener ventas realizadas
         async function fetchLambdaResult() {
             try {
@@ -326,6 +329,10 @@ async function exportarTablaAPDF() {
             }
         }
 
+    */
+
+    /**
+     *& Tabla "Existencias" */
         // Función para generar un informe
         async function generateReport() {
             try {
@@ -358,6 +365,8 @@ async function exportarTablaAPDF() {
             }
         }
 
+        /**
+         *^ Tabla principal con rango de fechas */
         // Función para renderizar la tabla con múltiples registros
         function renderTable(data) {
     document.getElementById("filtros-temporada").innerHTML = "";
@@ -429,431 +438,335 @@ tableContainer.innerHTML = tableHtml;
         // Función para renderizar la tabla de existencias
         let existenciasOriginales = [];
 
+
+/**
+ *? Tabla "Ventas" Nueva */
+
 function renderTableExistencias(data) {
     setTimeout(() => {
         generarCheckboxTemporadas();
     }, 100);
-            if (!data || !Array.isArray(data)) {
-                tableContainer.innerHTML = '<p class="error">Invalid "data" field.</p>';
-                return;
-            }
+    
+    if (!data || !Array.isArray(data)) {
+        tableContainer.innerHTML = '<p class="error">Invalid "data" field.</p>';
+        return;
+    }
 
-            // Obtener proveedores únicos
-            const proveedoresUnicos = Array.from(new Set(data.map(item => item.PROVEEDOR).filter(Boolean)));
+    // Obtener proveedores únicos
+    const proveedoresUnicos = Array.from(new Set(data.map(item => item.PROVEEDOR).filter(Boolean)));
 
-            // Crear una fila superior de título
-            const filaProveedor = `
+    // Determinar qué columnas de tallas tienen al menos un valor distinto de 0.0
+    const columnasConDatos = new Set();
+    
+    // Campos fijos que siempre mostraremos
+    const camposFijos = ['CODARTICULO', 'REFERENCIA', 'DESCRIPCION', 'TOTAL', 'PVP', 'TEMPORADA'];
+    
+    // Analizar todas las columnas de tallas (T18 a T48)
+    for (let i = 18; i <= 48; i++) {
+        const columna = `T${i}`;
+        const tieneDatos = data.some(item => item[columna] !== 0.0 && item[columna] !== null);
+        if (tieneDatos) {
+            columnasConDatos.add(columna);
+        }
+    }
+
+    // Ordenar las columnas con datos numéricamente
+    const columnasOrdenadas = Array.from(columnasConDatos).sort((a, b) => {
+        const numA = parseInt(a.substring(1));
+        const numB = parseInt(b.substring(1));
+        return numA - numB;
+    });
+
+    // Crear una fila superior de título
+    const filaProveedor = `
+        <tr>
+            <td colspan="${camposFijos.length + columnasOrdenadas.length + 1}" style="font-weight: bold; background-color: #f0f0f0; padding: 10px; text-align: left;">
+                EXISTENCIAS DEL PROVEEDOR: ${proveedoresUnicos.join(', ')}
+            </td>
+        </tr>
+    `;
+
+    // Crear los encabezados de las columnas
+    let headers = camposFijos.map(campo => 
+        `<th style="font-size: 12px">${campo === 'CODARTICULO' ? 'CODIGO' : 
+          campo === 'REFERENCIA' ? 'REF' : 
+          campo === 'DESCRIPCION' ? 'DESCRIPCIÓN' : 
+          campo}</th>`
+    ).join('');
+
+    // Añadir encabezados de tallas con datos
+    headers += columnasOrdenadas.map(col => 
+        `<th style="font-size: 12px">${col.substring(1)}</th>`
+    ).join('');
+
+    // Añadir columna de acciones
+    headers += `<th style="font-size: 12px"></th>`;
+
+    // Crear la tabla con encabezados fijos
+    let tableHtml = `
+       <table>
+            <thead>
+                ${filaProveedor}
                 <tr>
-                    <td colspan="100%" style="font-weight: bold; background-color: #f0f0f0; padding: 10px; text-align: left;">
-                        EXISTENCIAS DEL PROVEEDOR: ${proveedoresUnicos.join(', ')}
-                    </td>
+                    ${headers}
                 </tr>
-            `;
+            </thead>
+        <tbody>
+    `;
+
+    // Iterar sobre cada registro y agregarlo como una fila
+    data.forEach((record, index) => {
+        let row = camposFijos.map(campo => {
+            if (campo === 'CODARTICULO' || campo === 'REFERENCIA') {
+                return `<td style="font-size: 10px">${record[campo]}</td>`;
+            } else if (campo === 'DESCRIPCION') {
+                return `<td style="font-size: 10px">${record[campo]}</td>`;
+            } else {
+                return `<td style="font-size: 10px">${record[campo]}</td>`;
+            }
+        }).join('');
+
+        // Añadir celdas de tallas con datos
+        row += columnasOrdenadas.map(col => {
+            const valor = record[col];
+            return `<td style="font-size: 10px; background-color: ${valor !== null && valor !== 0 ? 'yellow' : 'transparent'}; 
+                    color: ${valor !== null && valor !== 0 ? 'black' : 'black'};">
+                    ${valor === null || valor === 0 ? '' : valor}
+                </td>`;
+        }).join('');
+
+        // Añadir botón de acciones
+        row += `<td><button class="button_stock" onclick="showDetailsStocks('${record.REFERENCIA}', ${index})">Stocks</button></td>`;
+
+        tableHtml += `<tr id="existencia-row-${index}">${row}</tr>`;
+    });
+
+    // Cerrar la tabla
+    tableHtml += `
+            </tbody>
+        </table>
+    `;
+
+    // Agregar la tabla al contenedor
+    let filtrosHtml = `
+        <strong>Filtrar por temporada:</strong>
+        <label><input type="checkbox" value="V25" onchange="filtrarPorTemporada()"> V25</label>
+        <label><input type="checkbox" value="V14" onchange="filtrarPorTemporada()"> V14</label>
+    `;
+    document.getElementById("filtros-temporada").innerHTML = filtrosHtml;
+    tableContainer.innerHTML = tableHtml;
+}
 
 
-            // Crear la tabla con encabezados fijos
-            let tableHtml = `
-               <table>
-                    <thead>
-                        ${filaProveedor}
-                        <tr>
-                            <th style="font-size: 12px">CODARTICULO</th>
-                            <th style="font-size: 12px">REFERENCIA</th>
-                            <th style="font-size: 12px">DESCRIPCION</th>
-                            <th style="font-size: 12px">18</th>
-                            <th style="font-size: 12px">19</th>
-                            <th style="font-size: 12px">20</th>
-                            <th style="font-size: 12px">21</th>
-                            <th style="font-size: 12px">22</th>
-                            <th style="font-size: 12px">23</th>
-                            <th style="font-size: 12px">24</th>
-                            <th style="font-size: 12px">25</th>
-                            <th style="font-size: 12px">26</th>
-                            <th style="font-size: 12px">27</th>
-                            <th style="font-size: 12px">28</th>
-                            <th style="font-size: 12px">29</th>
-                            <th style="font-size: 12px">30</th>
-                            <th style="font-size: 12px">31</th>
-                            <th style="font-size: 12px">32</th>
-                            <th style="font-size: 12px">33</th>
-                            <th style="font-size: 12px">34</th>
-                            <th style="font-size: 12px">35</th>
-                            <th style="font-size: 12px">36</th>
-                            <th style="font-size: 12px">37</th>
-                            <th style="font-size: 12px">38</th>
-                            <th style="font-size: 12px">39</th>
-                            <th style="font-size: 12px">40</th>
-                            <th style="font-size: 12px">41</th>
-                            <th style="font-size: 12px">42</th>
-                            <th style="font-size: 12px">43</th>
-                            <th style="font-size: 12px">44</th>
-                            <th style="font-size: 12Px">45</th>
-                            <th style="font-size: 12px">46</th>
-                            <th style="font-size: 12px">47</th>
-                            <th style="font-size: 12px">48</th>
-                            <th style="font-size: 12px">TOTAL</th>
-                            <th style="font-size: 12px">PVP</th>
-                            <th style="font-size: 12px">TEMPORADA</th>
-                            <th style="font-size: 12px"></th>
-                        </tr>
-                    </thead>
+/**
+ *? Tabla "Stocks" Nueva */
+
+async function showDetailsStocks(referencia, index) {
+    const detailsRowId = `details-row-${index}`;
+    let detailsRow = document.getElementById(detailsRowId);
+
+    // Verificar si ya existe la fila de detalles
+    if (document.getElementById(detailsRowId)) {
+        const existingRow = document.getElementById(detailsRowId);
+        existingRow.style.display = existingRow.style.display === "none" ? "table-row" : "none";
+        return;
+    }
+
+    // Crear/mostrar fila de carga
+    if (detailsRow) {
+        detailsRow.innerHTML = `<td colspan="7">Cargando stock actual...</td>`;
+    } else {
+        const mainRow = document.getElementById(`row-${index}`) || document.getElementById(`existencia-row-${index}`);
+        detailsRow = document.createElement("tr");
+        detailsRow.id = detailsRowId;
+        detailsRow.className = "details-row";
+        detailsRow.innerHTML = `<td colspan="7">Cargando stock actual...</td>`;
+        mainRow.insertAdjacentElement("afterend", detailsRow);
+    }
+
+    try {
+        const apiUrl = `${specificApiUrl}?referencia=${referencia}`;
+        const response = await fetch(apiUrl, { method: 'GET' });
+
+        if (!response.ok) {
+            throw new Error(`Error: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        const data_detail = result.data_detail;
+
+        // Paso 1: Identificar tallas con stock
+        const tallasConStock = new Set();
+        
+        data_detail.forEach(record => {
+            for (const [key, value] of Object.entries(record)) {
+                if (key.startsWith('T') && key.length === 3 && value > 0) {
+                    tallasConStock.add(key);
+                }
+            }
+        });
+
+        // Convertir a array y ordenar las tallas
+        const tallasMostrar = Array.from(tallasConStock).sort((a, b) => {
+            const numA = parseInt(a.substring(1));
+            const numB = parseInt(b.substring(1));
+            return numA - numB;
+        });
+
+        // Paso 2: Construir HTML dinámico
+        let detailsHtml = `
+            <table>
+                <thead>
+                    <tr>
+                        <th style="font-size: 12px">STOCK TIENDAS</th>
+        `;
+
+        // Agregar solo las columnas de tallas con stock
+        tallasMostrar.forEach(talla => {
+            detailsHtml += `<th style="font-size: 12px">${talla.substring(1)}</th>`;
+        });
+
+        detailsHtml += `
+                        <th style="font-size: 12px">TOTAL</th>
+                    </tr>
+                </thead>
                 <tbody>
-            `;
+        `;
 
-            // Iterar sobre cada registro y agregarlo como una fila
-            data.forEach((record, index) => {
-                tableHtml += `
-                    <tr id="existencia-row-${index}">
-                            <td style="font-size: 10px">${record.CODARTICULO}</td>
-                            <td style="font-size: 10px">${record.REFERENCIA}</td>
-                            <td style="font-size: 10px">${record.DESCRIPCION}</td>
-                            <td style="font-size: 10px; background-color: ${record.T18 !== null && record.T18 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T18 !== null && record.T18 !== 0 ? 'black' : 'black'};">${record.T18 === null || record.T18 === 0 ? '' : record.T18}</td>
-                            <td style="font-size: 10px; background-color: ${record.T19 !== null && record.T19 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T19 !== null && record.T19 !== 0 ? 'black' : 'black'};">${record.T19 === null || record.T19 === 0 ? '' : record.T19}</td>
-                            <td style="font-size: 10px; background-color: ${record.T20 !== null && record.T20 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T20 !== null && record.T20 !== 0 ? 'black' : 'black'};">${record.T20 === null || record.T20 === 0 ? '' : record.T20}</td>
-                            <td style="font-size: 10px; background-color: ${record.T21 !== null && record.T21 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T21 !== null && record.T21 !== 0 ? 'black' : 'black'};">${record.T21 === null || record.T21 === 0 ? '' : record.T21}</td>
-                            <td style="font-size: 10px; background-color: ${record.T22 !== null && record.T22 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T22 !== null && record.T22 !== 0 ? 'black' : 'black'};">${record.T22 === null || record.T22 === 0 ? '' : record.T22}</td>
-                            <td style="font-size: 10px; background-color: ${record.T23 !== null && record.T23 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T23 !== null && record.T23 !== 0 ? 'black' : 'black'};">${record.T23 === null || record.T23 === 0 ? '' : record.T23}</td>
-                            <td style="font-size: 10px; background-color: ${record.T24 !== null && record.T24 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T24 !== null && record.T24 !== 0 ? 'black' : 'black'};">${record.T24 === null || record.T24 === 0 ? '' : record.T24}</td>
-                            <td style="font-size: 10px; background-color: ${record.T25 !== null && record.T25 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T25 !== null && record.T25 !== 0 ? 'black' : 'black'};">${record.T25 === null || record.T25 === 0 ? '' : record.T25}</td>
-                            <td style="font-size: 10px; background-color: ${record.T26 !== null && record.T26 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T26 !== null && record.T26 !== 0 ? 'black' : 'black'};">${record.T26 === null || record.T26 === 0 ? '' : record.T26}</td>
-                            <td style="font-size: 10px; background-color: ${record.T27 !== null && record.T27 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T27 !== null && record.T27 !== 0 ? 'black' : 'black'};">${record.T27 === null || record.T27 === 0 ? '' : record.T27}</td>
-                            <td style="font-size: 10px; background-color: ${record.T28 !== null && record.T28 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T28 !== null && record.T28 !== 0 ? 'black' : 'black'};">${record.T28 === null || record.T28 === 0 ? '' : record.T28}</td>
-                            <td style="font-size: 10px; background-color: ${record.T29 !== null && record.T29 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T29 !== null && record.T29 !== 0 ? 'black' : 'black'};">${record.T29 === null || record.T29 === 0 ? '' : record.T29}</td>
-                            <td style="font-size: 10px; background-color: ${record.T30 !== null && record.T30 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T30 !== null && record.T30 !== 0 ? 'black' : 'black'};">${record.T30 === null || record.T30 === 0 ? '' : record.T30}</td>
-                            <td style="font-size: 10px; background-color: ${record.T31 !== null && record.T31 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T31 !== null && record.T31 !== 0 ? 'black' : 'black'};">${record.T31 === null || record.T31 === 0 ? '' : record.T31}</td>
-                            <td style="font-size: 10px; background-color: ${record.T32 !== null && record.T32 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T32 !== null && record.T32 !== 0 ? 'black' : 'black'};">${record.T32 === null || record.T32 === 0 ? '' : record.T32}</td>
-                            <td style="font-size: 10px; background-color: ${record.T33 !== null && record.T33 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T33 !== null && record.T33 !== 0 ? 'black' : 'black'};">${record.T33 === null || record.T33 === 0 ? '' : record.T33}</td>
-                            <td style="font-size: 10px; background-color: ${record.T34 !== null && record.T34 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T34 !== null && record.T34 !== 0 ? 'black' : 'black'};">${record.T34 === null || record.T34 === 0 ? '' : record.T34}</td>
-                            <td style="font-size: 10px; background-color: ${record.T35 !== null && record.T35 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T35 !== null && record.T35 !== 0 ? 'black' : 'black'};">${record.T35 === null || record.T35 === 0 ? '' : record.T35}</td>
-                            <td style="font-size: 10px; background-color: ${record.T36 !== null && record.T36 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T36 !== null && record.T36 !== 0 ? 'black' : 'black'};">${record.T36 === null || record.T36 === 0 ? '' : record.T36}</td>
-                            <td style="font-size: 10px; background-color: ${record.T37 !== null && record.T37 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T37 !== null && record.T37 !== 0 ? 'black' : 'black'};">${record.T37 === null || record.T37 === 0 ? '' : record.T37}</td>
-                            <td style="font-size: 10px; background-color: ${record.T38 !== null && record.T38 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T38 !== null && record.T38 !== 0 ? 'black' : 'black'};">${record.T38 === null || record.T38 === 0 ? '' : record.T38}</td>
-                            <td style="font-size: 10px; background-color: ${record.T39 !== null && record.T39 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T39 !== null && record.T39 !== 0 ? 'black' : 'black'};">${record.T39 === null || record.T39 === 0 ? '' : record.T39}</td>
-                            <td style="font-size: 10px; background-color: ${record.T40 !== null && record.T40 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T40 !== null && record.T40 !== 0 ? 'black' : 'black'};">${record.T40 === null || record.T40 === 0 ? '' : record.T40}</td>
-                            <td style="font-size: 10px; background-color: ${record.T41 !== null && record.T41 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T41 !== null && record.T41 !== 0 ? 'black' : 'black'};">${record.T41 === null || record.T41 === 0 ? '' : record.T41}</td>
-                            <td style="font-size: 10px; background-color: ${record.T42 !== null && record.T42 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T42 !== null && record.T42 !== 0 ? 'black' : 'black'};">${record.T42 === null || record.T42 === 0 ? '' : record.T42}</td>
-                            <td style="font-size: 10px; background-color: ${record.T43 !== null && record.T43 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T43 !== null && record.T43 !== 0 ? 'black' : 'black'};">${record.T43 === null || record.T43 === 0 ? '' : record.T43}</td>
-                            <td style="font-size: 10px; background-color: ${record.T44 !== null && record.T44 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T44 !== null && record.T44 !== 0 ? 'black' : 'black'};">${record.T44 === null || record.T44 === 0 ? '' : record.T44}</td>
-                            <td style="font-size: 10px; background-color: ${record.T45 !== null && record.T45 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T45 !== null && record.T45 !== 0 ? 'black' : 'black'};">${record.T45 === null || record.T45 === 0 ? '' : record.T45}</td>
-                            <td style="font-size: 10px; background-color: ${record.T46 !== null && record.T46 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T46 !== null && record.T46 !== 0 ? 'black' : 'black'};">${record.T46 === null || record.T46 === 0 ? '' : record.T46}</td>
-                            <td style="font-size: 10px; background-color: ${record.T47 !== null && record.T47 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T47 !== null && record.T47 !== 0 ? 'black' : 'black'};">${record.T47 === null || record.T47 === 0 ? '' : record.T47}</td>
-                            <td style="font-size: 10px; background-color: ${record.T48 !== null && record.T48 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T48 !== null && record.T48 !== 0 ? 'black' : 'black'};">${record.T48 === null || record.T48 === 0 ? '' : record.T48}</td>
-                            <td style="font-size: 10px">${record.TOTAL}</td>
-                            <td style="font-size: 10px">${record.PVP}</td>
-                            <td style="font-size: 10px">${record.TEMPORADA}</td>
-                            <td><button class="button_stock" onclick="showDetailsStocks('${record.REFERENCIA}', ${index})">Stocks</button></td>
-                        </tr>
+        // Renderizar los datos
+        data_detail.forEach(record => {
+            detailsHtml += `<tr><td style="font-size: 12px">${record.TIENDA}</td>`;
+            
+            // Solo mostrar las tallas con stock
+            tallasMostrar.forEach(talla => {
+                const value = record[talla];
+                detailsHtml += `
+                    <td style="font-size: 10px; 
+                              background-color: ${value > 0 ? 'yellow' : 'transparent'}; 
+                              color: black;">
+                        ${value > 0 ? value : ''}
+                    </td>
                 `;
             });
 
-            // Cerrar la tabla
-            tableHtml += `
-                    </tbody>
-                </table>
-            `;
+            detailsHtml += `<td style="font-size: 10px">${record.TOTAL}</td></tr>`;
+        });
 
-            // Agregar la tabla al contenedor
-            let filtrosHtml = `
-    <strong>Filtrar por temporada:</strong>
-    <label><input type="checkbox" value="V25" onchange="filtrarPorTemporada()"> V25</label>
-    <label><input type="checkbox" value="V14" onchange="filtrarPorTemporada()"> V14</label>
-`;
-document.getElementById("filtros-temporada").innerHTML = filtrosHtml;
-tableContainer.innerHTML = tableHtml;
+        detailsHtml += `</tbody></table>`;
+        
+        // Actualizar la fila con la tabla de detalles
+        detailsRow.innerHTML = `<td colspan="8">${detailsHtml}</td>`;
+    } catch (error) {
+        detailsRow.innerHTML = `<td colspan="8" class="error"> Error al cargar el stock actual: ${error.message}</td>`;
+    }
+}
 
+   
+/**
+ *? Tabla "Ventas" Nuevo */
+
+async function showDetailsHistorico(referencia, index) {
+    const detailsRowId = `details-historico-${index}`;
+    let detailsRow = document.getElementById(detailsRowId);
+
+    // Verificar si ya existe la fila de detalles
+    if (document.getElementById(detailsRowId)) {
+        const existingRow = document.getElementById(detailsRowId);
+        existingRow.style.display = existingRow.style.display === "none" ? "table-row" : "none";
+        return;
+    }
+
+    // Preparar la fila de detalles
+    if (detailsRow) {
+        detailsRow.innerHTML = `<td colspan="7">Cargando histórico...</td>`;
+    } else {
+        const mainRow = document.getElementById(`row-${index}`);
+        detailsRow = document.createElement("tr");
+        detailsRow.id = detailsRowId;
+        detailsRow.className = "details-row";
+        detailsRow.innerHTML = `<td colspan="7">Cargando histórico...</td>`;
+        mainRow.insertAdjacentElement("afterend", detailsRow);
+    }
+
+    try {
+        const apiUrl = `${specificApiUrlHistorico}?referencia=${referencia}`;
+        const response = await fetch(apiUrl, { method: 'GET' });
+
+        if (!response.ok) {
+            throw new Error(`Error: ${response.statusText}`);
         }
 
-        // Función para llamar a una API específica por fila
-        async function showDetailsStocks(referencia, index) {
-            const detailsRowId = `details-row-${index}`;
-            let detailsRow = document.getElementById(detailsRowId);
+        const result = await response.json();
+        const data_detail = result.data_detail;
 
-
-            //const mainRow = document.getElementById(`row-${index}`);
-            //const detailsRowId = `details-row-${index}`;
-
-            //Verificar si ya existe la fila de detalles
-            if (document.getElementById(detailsRowId)) {
-                //Si ya existe alternar la visibilidad
-                const existingRow = document.getElementById(detailsRowId);
-                existingRow.style.display = existingRow.style.display === "none" ? "table-row" : "none";
-                return;
-            }
-
-            //Crear una nueva fila para mostrar los detalles
-            //const detailsRow = document.createElement("tr");
-            //detailsRow.id = detailsRowId;
-            //detailsRow.className = "details-row";
-            //detailsRow.innerHTML = `<td colspan="7">Cargando stock actual...</td>`;
-
-            // Si la fila de detalles ya existe, simplemente la limpiamos antes de actualizarla
-            if (detailsRow) {
-                detailsRow.innerHTML = `<td colspan="7">Cargando stock actual...</td>`;
-            } else {
-                // Crear una nueva fila de detalles si no existe
-                const mainRow = document.getElementById(`row-${index}`) || document.getElementById(`existencia-row-${index}`);
-                detailsRow = document.createElement("tr");
-                detailsRow.id = detailsRowId;
-                detailsRow.className = "details-row";
-                detailsRow.innerHTML = `<td colspan="7">Cargando stock actual...</td>`;
-
-                //Insertar la nueva fila debajo de la fila principal
-                mainRow.insertAdjacentElement("afterend", detailsRow);
-            }
-
-            try {
-                const apiUrl = `${specificApiUrl}?referencia=${referencia}`;
-                const response = await fetch(apiUrl, { method: 'GET' });
-
-                if (!response.ok) {
-                    throw new Error(`Error: ${response.statusText}`);
+        // Paso 1: Identificar qué columnas tienen datos (excluyendo ceros)
+        const columnasConDatos = new Set();
+        
+        data_detail.forEach(record => {
+            for (let i = 18; i <= 48; i++) {
+                const columna = `T${i}`;
+                if (record[columna] !== null && record[columna] !== 0) {
+                    columnasConDatos.add(columna);
                 }
+            }
+        });
 
-                const result = await response.json();
-                data_detail = result.data_detail
+        // Convertir a array y ordenar
+        const columnasMostrar = Array.from(columnasConDatos).sort((a, b) => {
+            return parseInt(a.substring(1)) - parseInt(b.substring(1));
+        });
 
-                //Renderizar los detalles como una nueva tabla
-                let detailsHtml = `
-                    <table>
-                        <thead>
-                            <tr>
-                                <th style="font-size: 12px">STOCK TIENDAS</th>
-                                <th style="font-size: 12px">18</th>
-                                <th style="font-size: 12px">19</th>
-                                <th style="font-size: 12px">20</th>
-                                <th style="font-size: 12px">21</th>
-                                <th style="font-size: 12px">22</th>
-                                <th style="font-size: 12px">23</th>
-                                <th style="font-size: 12px">24</th>
-                                <th style="font-size: 12px">25</th>
-                                <th style="font-size: 12px">26</th>
-                                <th style="font-size: 12px">27</th>
-                                <th style="font-size: 12px">28</th>
-                                <th style="font-size: 12px">29</th>
-                                <th style="font-size: 12px">30</th>
-                                <th style="font-size: 12px">31</th>
-                                <th style="font-size: 12px">32</th>
-                                <th style="font-size: 12px">33</th>
-                                <th style="font-size: 12px">34</th>
-                                <th style="font-size: 12px">35</th>
-                                <th style="font-size: 12px">36</th>
-                                <th style="font-size: 12px">37</th>
-                                <th style="font-size: 12px">38</th>
-                                <th style="font-size: 12px">39</th>
-                                <th style="font-size: 12px">40</th>
-                                <th style="font-size: 12px">41</th>
-                                <th style="font-size: 12px">42</th>
-                                <th style="font-size: 12px">43</th>
-                                <th style="font-size: 12px">44</th>
-                                <th style="font-size: 12Px">45</th>
-                                <th style="font-size: 12px">46</th>
-                                <th style="font-size: 12px">47</th>
-                                <th style="font-size: 12px">48</th>
-                                <th style="font-size: 12px">TOTAL</th>
-                            </tr>
-                        </thead>
-                        <tbody>
+        // Paso 2: Construir los headers de la tabla dinámicamente
+        let headersHtml = `
+            <table>
+                <thead>
+                    <tr>
+                        <th style="font-size: 12px">VENTAS TIENDAS</th>
+        `;
+        
+        // Agregar solo las columnas con datos
+        columnasMostrar.forEach(col => {
+            const tallaNum = col.substring(1);
+            headersHtml += `<th style="font-size: 12px">${tallaNum}</th>`;
+        });
+        
+        headersHtml += `<th style="font-size: 12px">TOTAL</th></tr></thead><tbody>`;
+
+        // Paso 3: Construir las filas de datos
+        let detailsHtml = headersHtml;
+        
+        data_detail.forEach(record => {
+            detailsHtml += `<tr><td style="font-size: 12px">${record.TIENDA}</td>`;
+            
+            // Solo agregar celdas para columnas con datos
+            columnasMostrar.forEach(col => {
+                const valor = record[col];
+                // Determinar estilo según el valor
+                const estilo = valor === 0 ? 
+                    'font-size: 10px; background-color: transparent; color: black;' : 
+                    'font-size: 10px; background-color: #90EE90; color: black;';
+                
+                // Mostrar valor solo si no es 0
+                const contenido = valor === 0 ? '' : valor;
+                
+                detailsHtml += `
+                    <td style="${estilo}">
+                        ${contenido}
+                    </td>
                 `;
-                
-                //for (const [key, value] of Object.entries(result)) {
-                //    detailsHtml += `<tr><td>${key}</td><td>${typeof value === 'object' ? JSON.stringify(value) : value}</td></tr>`;
-                //}
+            });
+            
+            detailsHtml += `<td style="font-size: 10px">${record.TOTAL}</td></tr>`;
+        });
 
-                 // Iterar sobre cada registro y agregarlo como una fila
-                data_detail.forEach(record => {
-                    detailsHtml += `
-                        <tr>
-                            <td style="font-size: 12px">${record.TIENDA}</td>
-                            <td style="font-size: 10px; background-color: ${record.T18 !== null && record.T18 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T18 !== null && record.T18 !== 0 ? 'black' : 'black'};">${record.T18 === null || record.T18 === 0  ? '' : record.T18}</td>
-                            <td style="font-size: 10px; background-color: ${record.T19 !== null && record.T19 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T19 !== null && record.T19 !== 0 ? 'black' : 'black'};">${record.T19 === null || record.T19 === 0  ? '' : record.T19}</td>
-                            <td style="font-size: 10px; background-color: ${record.T20 !== null && record.T20 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T20 !== null && record.T20 !== 0 ? 'black' : 'black'};">${record.T20 === null || record.T20 === 0  ? '' : record.T20}</td>
-                            <td style="font-size: 10px; background-color: ${record.T21 !== null && record.T21 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T21 !== null && record.T21 !== 0 ? 'black' : 'black'};">${record.T21 === null || record.T21 === 0  ? '' : record.T21}</td>
-                            <td style="font-size: 10px; background-color: ${record.T22 !== null && record.T22 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T22 !== null && record.T22 !== 0 ? 'black' : 'black'};">${record.T22 === null || record.T22 === 0  ? '' : record.T22}</td>
-                            <td style="font-size: 10px; background-color: ${record.T23 !== null && record.T23 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T23 !== null && record.T23 !== 0 ? 'black' : 'black'};">${record.T23 === null || record.T23 === 0  ? '' : record.T23}</td>
-                            <td style="font-size: 10px; background-color: ${record.T24 !== null && record.T24 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T24 !== null && record.T24 !== 0 ? 'black' : 'black'};">${record.T24 === null || record.T24 === 0  ? '' : record.T24}</td>
-                            <td style="font-size: 10px; background-color: ${record.T25 !== null && record.T25 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T25 !== null && record.T25 !== 0 ? 'black' : 'black'};">${record.T25 === null || record.T25 === 0  ? '' : record.T25}</td>
-                            <td style="font-size: 10px; background-color: ${record.T26 !== null && record.T26 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T26 !== null && record.T26 !== 0 ? 'black' : 'black'};">${record.T26 === null || record.T26 === 0  ? '' : record.T26}</td>
-                            <td style="font-size: 10px; background-color: ${record.T27 !== null && record.T27 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T27 !== null && record.T27 !== 0 ? 'black' : 'black'};">${record.T27 === null || record.T27 === 0  ? '' : record.T27}</td>
-                            <td style="font-size: 10px; background-color: ${record.T28 !== null && record.T28 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T28 !== null && record.T28 !== 0 ? 'black' : 'black'};">${record.T28 === null || record.T28 === 0  ? '' : record.T28}</td>
-                            <td style="font-size: 10px; background-color: ${record.T29 !== null && record.T29 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T29 !== null && record.T29 !== 0 ? 'black' : 'black'};">${record.T29 === null || record.T29 === 0  ? '' : record.T29}</td>
-                            <td style="font-size: 10px; background-color: ${record.T30 !== null && record.T30 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T30 !== null && record.T30 !== 0 ? 'black' : 'black'};">${record.T30 === null || record.T30 === 0  ? '' : record.T30}</td>
-                            <td style="font-size: 10px; background-color: ${record.T31 !== null && record.T31 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T31 !== null && record.T31 !== 0 ? 'black' : 'black'};">${record.T31 === null || record.T31 === 0  ? '' : record.T31}</td>
-                            <td style="font-size: 10px; background-color: ${record.T32 !== null && record.T32 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T32 !== null && record.T32 !== 0 ? 'black' : 'black'};">${record.T32 === null || record.T32 === 0  ? '' : record.T32}</td>
-                            <td style="font-size: 10px; background-color: ${record.T33 !== null && record.T33 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T33 !== null && record.T33 !== 0 ? 'black' : 'black'};">${record.T33 === null || record.T33 === 0  ? '' : record.T33}</td>
-                            <td style="font-size: 10px; background-color: ${record.T34 !== null && record.T34 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T34 !== null && record.T34 !== 0 ? 'black' : 'black'};">${record.T34 === null || record.T34 === 0  ? '' : record.T34}</td>
-                            <td style="font-size: 10px; background-color: ${record.T35 !== null && record.T35 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T35 !== null && record.T35 !== 0 ? 'black' : 'black'};">${record.T35 === null || record.T35 === 0  ? '' : record.T35}</td>
-                            <td style="font-size: 10px; background-color: ${record.T36 !== null && record.T36 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T36 !== null && record.T36 !== 0 ? 'black' : 'black'};">${record.T36 === null || record.T36 === 0  ? '' : record.T36}</td>
-                            <td style="font-size: 10px; background-color: ${record.T37 !== null && record.T37 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T37 !== null && record.T37 !== 0 ? 'black' : 'black'};">${record.T37 === null || record.T37 === 0  ? '' : record.T37}</td>
-                            <td style="font-size: 10px; background-color: ${record.T38 !== null && record.T38 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T38 !== null && record.T38 !== 0 ? 'black' : 'black'};">${record.T38 === null || record.T38 === 0  ? '' : record.T38}</td>
-                            <td style="font-size: 10px; background-color: ${record.T39 !== null && record.T39 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T39 !== null && record.T39 !== 0 ? 'black' : 'black'};">${record.T39 === null || record.T39 === 0  ? '' : record.T39}</td>
-                            <td style="font-size: 10px; background-color: ${record.T40 !== null && record.T40 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T40 !== null && record.T40 !== 0 ? 'black' : 'black'};">${record.T40 === null || record.T40 === 0  ? '' : record.T40}</td>
-                            <td style="font-size: 10px; background-color: ${record.T41 !== null && record.T41 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T41 !== null && record.T41 !== 0 ? 'black' : 'black'};">${record.T41 === null || record.T41 === 0  ? '' : record.T41}</td>
-                            <td style="font-size: 10px; background-color: ${record.T42 !== null && record.T42 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T42 !== null && record.T42 !== 0 ? 'black' : 'black'};">${record.T42 === null || record.T42 === 0  ? '' : record.T42}</td>
-                            <td style="font-size: 10px; background-color: ${record.T43 !== null && record.T43 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T43 !== null && record.T43 !== 0 ? 'black' : 'black'};">${record.T43 === null || record.T43 === 0  ? '' : record.T43}</td>
-                            <td style="font-size: 10px; background-color: ${record.T44 !== null && record.T44 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T44 !== null && record.T44 !== 0 ? 'black' : 'black'};">${record.T44 === null || record.T44 === 0  ? '' : record.T44}</td>
-                            <td style="font-size: 10px; background-color: ${record.T45 !== null && record.T45 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T45 !== null && record.T45 !== 0 ? 'black' : 'black'};">${record.T45 === null || record.T45 === 0  ? '' : record.T45}</td>
-                            <td style="font-size: 10px; background-color: ${record.T46 !== null && record.T46 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T46 !== null && record.T46 !== 0 ? 'black' : 'black'};">${record.T46 === null || record.T46 === 0  ? '' : record.T46}</td>
-                            <td style="font-size: 10px; background-color: ${record.T47 !== null && record.T47 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T47 !== null && record.T47 !== 0 ? 'black' : 'black'};">${record.T47 === null || record.T47 === 0  ? '' : record.T47}</td>
-                            <td style="font-size: 10px; background-color: ${record.T48 !== null && record.T48 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T48 !== null && record.T48 !== 0 ? 'black' : 'black'};">${record.T48 === null || record.T48 === 0  ? '' : record.T48}</td>
-                            <td style="font-size: 10px">${record.TOTAL}</td>
-                        </tr>
-                    `;
-                });
-
-                detailsHtml += `</tbody><table>`;
-                
-                //Actualizar la fila con la tabla de detalles
-                detailsRow.innerHTML = `<td colspan="8">${detailsHtml}</td>`;
-            } catch (error) {
-                detailsRow.innerHTML = `<td colspan="8" class="error"> Error al cargar el stock actual: ${error.message}</td>`;
-            }
-        }
-
-
-        // Función para llamar a una API específica por fila
-        async function showDetailsHistorico(referencia, index) {
-            const detailsRowId = `details-historico-${index}`;
-            let detailsRow = document.getElementById(detailsRowId);
-
-            //const mainRow = document.getElementById(`row-${index}`);
-            //const detailsRowId = `details-row-${index}`;
-
-            //Verificar si ya existe la fila de detalles
-            if (document.getElementById(detailsRowId)) {
-                //Si ya existe alternar la visibilidad
-                const existingRow = document.getElementById(detailsRowId);
-                existingRow.style.display = existingRow.style.display === "none" ? "table-row" : "none";
-                return;
-            }
-
-            //Crear una nueva fila para mostrar los detalles
-            //const detailsRow = document.createElement("tr");
-            //detailsRow.id = detailsRowId;
-            //detailsRow.className = "details-row";
-            //detailsRow.innerHTML = `<td colspan="7">Cargando histórico ventas...</td>`;
-
-            // Si la fila de detalles ya existe, simplemente la limpiamos antes de actualizarla
-            if (detailsRow) {
-                detailsRow.innerHTML = `<td colspan="7">Cargando histórico...</td>`;
-            } else {
-                // Crear una nueva fila de detalles si no existe
-                const mainRow = document.getElementById(`row-${index}`);
-                detailsRow = document.createElement("tr");
-                detailsRow.id = detailsRowId;
-                detailsRow.className = "details-row";
-                detailsRow.innerHTML = `<td colspan="7">Cargando histórico...</td>`;
-
-                // Insertar la nueva fila debajo de la fila principal
-                mainRow.insertAdjacentElement("afterend", detailsRow);
-            }
-
-            try {
-                const apiUrl = `${specificApiUrlHistorico}?referencia=${referencia}`;
-                const response = await fetch(apiUrl, { method: 'GET' });
-
-                if (!response.ok) {
-                    throw new Error(`Error: ${response.statusText}`);
-                }
-
-                const result = await response.json();
-                data_detail = result.data_detail
-
-                //Renderizar los detalles como una nueva tabla
-                let detailsHtml = `
-                    <table>
-                        <thead>
-                            <tr>
-                                <th style="font-size: 12px"> VENTAS TIENDAS</th>
-                                <th style="font-size: 12px">18</th>
-                                <th style="font-size: 12px">19</th>
-                                <th style="font-size: 12px">20</th>
-                                <th style="font-size: 12px">21</th>
-                                <th style="font-size: 12px">22</th>
-                                <th style="font-size: 12px">23</th>
-                                <th style="font-size: 12px">24</th>
-                                <th style="font-size: 12px">25</th>
-                                <th style="font-size: 12px">26</th>
-                                <th style="font-size: 12px">27</th>
-                                <th style="font-size: 12px">28</th>
-                                <th style="font-size: 12px">29</th>
-                                <th style="font-size: 12px">30</th>
-                                <th style="font-size: 12px">31</th>
-                                <th style="font-size: 12px">32</th>
-                                <th style="font-size: 12px">33</th>
-                                <th style="font-size: 12px">34</th>
-                                <th style="font-size: 12px">35</th>
-                                <th style="font-size: 12px">36</th>
-                                <th style="font-size: 12px">37</th>
-                                <th style="font-size: 12px">38</th>
-                                <th style="font-size: 12px">39</th>
-                                <th style="font-size: 12px">40</th>
-                                <th style="font-size: 12px">41</th>
-                                <th style="font-size: 12px">42</th>
-                                <th style="font-size: 12px">43</th>
-                                <th style="font-size: 12px">44</th>
-                                <th style="font-size: 12Px">45</th>
-                                <th style="font-size: 12px">46</th>
-                                <th style="font-size: 12px">47</th>
-                                <th style="font-size: 12px">48</th>
-                                <th style="font-size: 12px">TOTAL</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                `;
-                
-                //for (const [key, value] of Object.entries(result)) {
-                //    detailsHtml += `<tr><td>${key}</td><td>${typeof value === 'object' ? JSON.stringify(value) : value}</td></tr>`;
-                //}
-
-                 // Iterar sobre cada registro y agregarlo como una fila
-                data_detail.forEach(record => {
-                    detailsHtml += `
-                        <tr>
-                            <td style="font-size: 12px">${record.TIENDA}</td>
-                            <td style="font-size: 10px; background-color: ${record.T18 !== null && record.T18 !== 0 ? '#90EE90' : 'transparent'}; color: ${record.T18 !== null && record.T18 !== 0 ? 'black' : 'black'};">${record.T18 === null || record.T18 === 0  ? '' : record.T18}</td>
-                            <td style="font-size: 10px; background-color: ${record.T19 !== null && record.T19 !== 0 ? '#90EE90' : 'transparent'}; color: ${record.T19 !== null && record.T19 !== 0 ? 'black' : 'black'};">${record.T19 === null || record.T18 === 0  ? '' : record.T19}</td>
-                            <td style="font-size: 10px; background-color: ${record.T20 !== null && record.T20 !== 0 ? '#90EE90' : 'transparent'}; color: ${record.T20 !== null && record.T20 !== 0 ? 'black' : 'black'};">${record.T20 === null || record.T18 === 0  ? '' : record.T20}</td>
-                            <td style="font-size: 10px; background-color: ${record.T21 !== null && record.T21 !== 0 ? '#90EE90' : 'transparent'}; color: ${record.T21 !== null && record.T21 !== 0 ? 'black' : 'black'};">${record.T21 === null || record.T18 === 0  ? '' : record.T21}</td>
-                            <td style="font-size: 10px; background-color: ${record.T22 !== null && record.T22 !== 0 ? '#90EE90' : 'transparent'}; color: ${record.T22 !== null && record.T22 !== 0 ? 'black' : 'black'};">${record.T22 === null || record.T18 === 0  ? '' : record.T22}</td>
-                            <td style="font-size: 10px; background-color: ${record.T23 !== null && record.T23 !== 0 ? '#90EE90' : 'transparent'}; color: ${record.T23 !== null && record.T23 !== 0 ? 'black' : 'black'};">${record.T23 === null || record.T23 === 0  ? '' : record.T23}</td>
-                            <td style="font-size: 10px; background-color: ${record.T24 !== null && record.T24 !== 0 ? '#90EE90' : 'transparent'}; color: ${record.T24 !== null && record.T24 !== 0 ? 'black' : 'black'};">${record.T24 === null || record.T24 === 0  ? '' : record.T24}</td>
-                            <td style="font-size: 10px; background-color: ${record.T25 !== null && record.T25 !== 0 ? '#90EE90' : 'transparent'}; color: ${record.T25 !== null && record.T25 !== 0 ? 'black' : 'black'};">${record.T25 === null || record.T25 === 0  ? '' : record.T25}</td>
-                            <td style="font-size: 10px; background-color: ${record.T26 !== null && record.T26 !== 0 ? '#90EE90' : 'transparent'}; color: ${record.T26 !== null && record.T26 !== 0 ? 'black' : 'black'};">${record.T26 === null || record.T26 === 0  ? '' : record.T26}</td>
-                            <td style="font-size: 10px; background-color: ${record.T27 !== null && record.T27 !== 0 ? '#90EE90' : 'transparent'}; color: ${record.T27 !== null && record.T27 !== 0 ? 'black' : 'black'};">${record.T27 === null || record.T27 === 0  ? '' : record.T27}</td>
-                            <td style="font-size: 10px; background-color: ${record.T28 !== null && record.T28 !== 0 ? '#90EE90' : 'transparent'}; color: ${record.T28 !== null && record.T28 !== 0 ? 'black' : 'black'};">${record.T28 === null || record.T28 === 0  ? '' : record.T28}</td>
-                            <td style="font-size: 10px; background-color: ${record.T29 !== null && record.T29 !== 0 ? '#90EE90' : 'transparent'}; color: ${record.T29 !== null && record.T29 !== 0 ? 'black' : 'black'};">${record.T29 === null || record.T29 === 0  ? '' : record.T29}</td>
-                            <td style="font-size: 10px; background-color: ${record.T30 !== null && record.T30 !== 0 ? '#90EE90' : 'transparent'}; color: ${record.T30 !== null && record.T30 !== 0 ? 'black' : 'black'};">${record.T30 === null || record.T30 === 0  ? '' : record.T30}</td>
-                            <td style="font-size: 10px; background-color: ${record.T31 !== null && record.T31 !== 0 ? '#90EE90' : 'transparent'}; color: ${record.T31 !== null && record.T31 !== 0 ? 'black' : 'black'};">${record.T31 === null || record.T31 === 0  ? '' : record.T31}</td>
-                            <td style="font-size: 10px; background-color: ${record.T32 !== null && record.T32 !== 0 ? '#90EE90' : 'transparent'}; color: ${record.T32 !== null && record.T32 !== 0 ? 'black' : 'black'};">${record.T32 === null || record.T32 === 0  ? '' : record.T32}</td>
-                            <td style="font-size: 10px; background-color: ${record.T33 !== null && record.T33 !== 0 ? '#90EE90' : 'transparent'}; color: ${record.T33 !== null && record.T33 !== 0 ? 'black' : 'black'};">${record.T33 === null || record.T33 === 0  ? '' : record.T33}</td>
-                            <td style="font-size: 10px; background-color: ${record.T34 !== null && record.T34 !== 0 ? '#90EE90' : 'transparent'}; color: ${record.T34 !== null && record.T34 !== 0 ? 'black' : 'black'};">${record.T34 === null || record.T34 === 0  ? '' : record.T34}</td>
-                            <td style="font-size: 10px; background-color: ${record.T35 !== null && record.T35 !== 0 ? '#90EE90' : 'transparent'}; color: ${record.T35 !== null && record.T35 !== 0 ? 'black' : 'black'};">${record.T35 === null || record.T35 === 0  ? '' : record.T35}</td>
-                            <td style="font-size: 10px; background-color: ${record.T36 !== null && record.T36 !== 0 ? '#90EE90' : 'transparent'}; color: ${record.T36 !== null && record.T36 !== 0 ? 'black' : 'black'};">${record.T36 === null || record.T36 === 0  ? '' : record.T36}</td>
-                            <td style="font-size: 10px; background-color: ${record.T37 !== null && record.T37 !== 0 ? '#90EE90' : 'transparent'}; color: ${record.T37 !== null && record.T37 !== 0 ? 'black' : 'black'};">${record.T37 === null || record.T37 === 0  ? '' : record.T37}</td>
-                            <td style="font-size: 10px; background-color: ${record.T38 !== null && record.T38 !== 0 ? '#90EE90' : 'transparent'}; color: ${record.T38 !== null && record.T38 !== 0 ? 'black' : 'black'};">${record.T38 === null || record.T38 === 0  ? '' : record.T38}</td>
-                            <td style="font-size: 10px; background-color: ${record.T39 !== null && record.T39 !== 0 ? '#90EE90' : 'transparent'}; color: ${record.T39 !== null && record.T39 !== 0 ? 'black' : 'black'};">${record.T39 === null || record.T39 === 0  ? '' : record.T39}</td>
-                            <td style="font-size: 10px; background-color: ${record.T40 !== null && record.T40 !== 0 ? '#90EE90' : 'transparent'}; color: ${record.T40 !== null && record.T40 !== 0 ? 'black' : 'black'};">${record.T40 === null || record.T40 === 0  ? '' : record.T40}</td>
-                            <td style="font-size: 10px; background-color: ${record.T41 !== null && record.T41 !== 0 ? '#90EE90' : 'transparent'}; color: ${record.T41 !== null && record.T41 !== 0 ? 'black' : 'black'};">${record.T41 === null || record.T41 === 0  ? '' : record.T41}</td>
-                            <td style="font-size: 10px; background-color: ${record.T42 !== null && record.T42 !== 0 ? '#90EE90' : 'transparent'}; color: ${record.T42 !== null && record.T42 !== 0 ? 'black' : 'black'};">${record.T42 === null || record.T42 === 0  ? '' : record.T42}</td>
-                            <td style="font-size: 10px; background-color: ${record.T43 !== null && record.T43 !== 0 ? '#90EE90' : 'transparent'}; color: ${record.T43 !== null && record.T43 !== 0 ? 'black' : 'black'};">${record.T43 === null || record.T43 === 0  ? '' : record.T43}</td>
-                            <td style="font-size: 10px; background-color: ${record.T44 !== null && record.T44 !== 0 ? '#90EE90' : 'transparent'}; color: ${record.T44 !== null && record.T44 !== 0 ? 'black' : 'black'};">${record.T44 === null || record.T44 === 0  ? '' : record.T44}</td>
-                            <td style="font-size: 10px; background-color: ${record.T45 !== null && record.T45 !== 0 ? '#90EE90' : 'transparent'}; color: ${record.T45 !== null && record.T45 !== 0 ? 'black' : 'black'};">${record.T45 === null || record.T45 === 0  ? '' : record.T45}</td>
-                            <td style="font-size: 10px; background-color: ${record.T46 !== null && record.T46 !== 0 ? '#90EE90' : 'transparent'}; color: ${record.T46 !== null && record.T46 !== 0 ? 'black' : 'black'};">${record.T46 === null || record.T46 === 0  ? '' : record.T46}</td>
-                            <td style="font-size: 10px; background-color: ${record.T47 !== null && record.T47 !== 0 ? '#90EE90' : 'transparent'}; color: ${record.T47 !== null && record.T47 !== 0 ? 'black' : 'black'};">${record.T47 === null || record.T47 === 0  ? '' : record.T47}</td>
-                            <td style="font-size: 10px; background-color: ${record.T48 !== null && record.T48 !== 0 ? '#90EE90' : 'transparent'}; color: ${record.T48 !== null && record.T48 !== 0 ? 'black' : 'black'};">${record.T48 === null || record.T48 === 0  ? '' : record.T48}</td>
-                            <td style="font-size: 10px">${record.TOTAL}</td>
-                        </tr>
-                    `;
-                });
-
-                detailsHtml += `</tbody><table>`;
-                
-                //Actualizar la fila con la tabla de detalles
-                detailsRow.innerHTML = `<td colspan="8">${detailsHtml}</td>`;
-            } catch (error) {
-                detailsRow.innerHTML = `<td colspan="8" class="error"> Error al cargar el stock actual: ${error.message}</td>`;
-            }
-        }
+        detailsHtml += `</tbody></table>`;
+        
+        // Actualizar la fila con la tabla de detalles optimizada
+        detailsRow.innerHTML = `<td colspan="8">${detailsHtml}</td>`;
+    } catch (error) {
+        detailsRow.innerHTML = `<td colspan="8" class="error">Error al cargar el stock actual: ${error.message}</td>`;
+    }
+}
 
         // Eventos
         //fetchButton.addEventListener('click', fetchLambdaResult);
@@ -1529,6 +1442,7 @@ async function generateHistoricoStock() {
     }
 }
 
+
 function renderHistoricoStock(data) {
     if (!Array.isArray(data) || data.length === 0) {
         document.getElementById("table-container").innerHTML = "<p class='error'>No hay datos para mostrar.</p>";
@@ -1637,6 +1551,7 @@ function renderHistoricoStock(data) {
     tableHtml += `</tbody></table>`;
     document.getElementById("table-container").innerHTML = leyendaHtml + tableHtml;
 }
+
 
 
 function generarCheckboxTallas(data) {
@@ -1770,9 +1685,12 @@ function renderCatalogo(data) {
         articulosMap.get(cod).tallas.add(item.talla);
     });
 
+const grBtnBot = document.getElementById("gr-btns-bot")
+
+
     // Render catálogo como tabla visual
     let html = `
-  <button id="btn-export-pdf">Exportar catálogo a PDF</button>
+<button style="background-color: #9f66ad" id="btn-export-pdf">Exportar catálogo</button>
   <div id="galeria" style="
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -2023,14 +1941,38 @@ async function toDataUrl(url) {
 }
 
 
-
-
+/**
+ *? Tabla "Consulta" Nuevo */
 
 function renderMiniTable(data, tipo = "") {
     if (!Array.isArray(data) || data.length === 0) return "<p>Sin datos</p>";
 
-    const headers = Object.keys(data[0]);
-    let html = "<table><thead><tr>";
+    // Identificar columnas a mostrar (las que tienen al menos un valor != 0)
+    const allKeys = Object.keys(data[0]);
+    const columnsToShow = new Set();
+    
+    // Siempre mostrar estas columnas
+    const mandatoryColumns = ['DESCRIPCION', 'REFPROVEEDOR', 'REFERENCIA', 'TIENDA', 'TOTAL'];
+    
+    // Primero añadimos las columnas obligatorias
+    mandatoryColumns.forEach(col => {
+        if (allKeys.includes(col)) columnsToShow.add(col);
+    });
+
+    // Luego analizamos columnas de tallas (que empiezan por T seguido de número)
+    const sizeColumns = allKeys.filter(key => /^T\d+$/.test(key));
+    
+    // Verificar qué tallas tienen al menos un valor distinto de 0
+    sizeColumns.forEach(col => {
+        const hasNonZero = data.some(item => item[col] !== 0.0);
+        if (hasNonZero) columnsToShow.add(col);
+    });
+
+    // Convertir Set a Array para mantener orden consistente
+    const headers = allKeys.filter(key => columnsToShow.has(key));
+
+    // Generar la tabla HTML
+    let html = "<div class='table-responsive'><table class='table table-striped table-bordered'><thead><tr>";
     headers.forEach(h => html += `<th>${h}</th>`);
     html += "</tr></thead><tbody>";
 
@@ -2038,21 +1980,24 @@ function renderMiniTable(data, tipo = "") {
         html += "<tr>";
         headers.forEach(h => {
             const valor = row[h];
-            const mostrar = (valor === 0 || valor === null) ? "" : valor;
+            const mostrar = (valor === 0 || valor === null || valor === undefined) ? "" : valor;
             let bgColor = "transparent";
 
             if (typeof valor === "number" && valor !== 0) {
-                bgColor = tipo === "stock" ? "yellow" : tipo === "ventas" ? "#90EE90" : "transparent";
+                bgColor = tipo === "stock" ? "rgba(255, 255, 0, 0.3)" : 
+                          tipo === "ventas" ? "rgba(144, 238, 144, 0.3)" : 
+                          "transparent";
             }
 
-            html += `<td style="background-color: ${bgColor}; color: black;">${mostrar}</td>`;
+            html += `<td style="background-color: ${bgColor}; color: black; text-align: center;">${mostrar}</td>`;
         });
         html += "</tr>";
     });
 
-    html += "</tbody></table>";
+    html += "</tbody></table></div>";
     return html;
 }
+
 
 
 function imprimirTicket() {
