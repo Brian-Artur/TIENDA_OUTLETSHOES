@@ -1,0 +1,2684 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--<title>CENTRAL CALZADOS BREOGÁN, S.L.</title>-->
+    <title>TIENDA OUTLETSHOES</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f9f9f9;
+        margin: 0;
+        padding: 0;
+      }
+      .container {
+        max-width: 100%;
+        margin: 20px auto;
+        background: #fff;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+      h1 {
+        font-size: 24px;
+        color: #333;
+        text-align: center;
+      }
+      .button-group {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-top: 20px;
+      }
+      button {
+        padding: 10px 15px;
+        font-size: 16px;
+        background-color: #4caf50;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      button:hover {
+        background-color: #45a049;
+      }
+      .report-button {
+        background-color: #007bff;
+      }
+      .report-button:hover {
+        background-color: #0056b3;
+      }
+      .button_stock {
+        display: block;
+        width: 100%;
+        padding: 5px;
+        margin-top: 0px;
+        font-size: 12px;
+        background-color: #e4d500;
+        color: white;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+      }
+      .button_stock:hover {
+        background-color: #e4d500;
+      }
+      .button_ventas {
+        display: block;
+        width: 100%;
+        padding: 5px;
+        margin-top: 0px;
+        font-size: 12px;
+        background-color: #039e00;
+        color: white;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+      }
+      .button_ventas:hover {
+        background-color: #039e00;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+      }
+      table th,
+      table td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        font-size: 12px;
+        text-align: left;
+      }
+      table th {
+        background-color: #f2f2f2;
+        color: #333;
+      }
+      .details-row {
+        background-color: #f9f9f9;
+      }
+      .error {
+        color: red;
+        font-weight: bold;
+      }
+      #table-container {
+        margin-top: 20px;
+      }
+      .benefits-button {
+        background-color: #000;
+        color: #fff;
+        padding: 10px 15px;
+        font-size: 16px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      .benefits-button:hover {
+        background-color: #333;
+      }
+    </style>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+    <script>
+      let lastHistoricoData = [];
+
+      function exportarTablaAExcel() {
+        const tabla = document.querySelector("#table-container table");
+        if (!tabla) return alert("No hay tabla para exportar.");
+
+        let csv = [];
+        for (let fila of tabla.rows) {
+          let row = [];
+          for (let celda of fila.cells) {
+            row.push('"' + celda.innerText.replace(/"/g, '""') + '"');
+          }
+          csv.push(row.join(","));
+        }
+
+        const blob = new Blob([csv.join("\n")], {
+          type: "text/csv;charset=utf-8;",
+        });
+        const url = URL.createObjectURL(blob);
+
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "existencias.csv";
+        link.click();
+      }
+
+      async function exportarTablaAPDF() {
+        if (!window.jspdf || !window.jspdf.jsPDF) {
+          alert("La librería jsPDF no está cargada correctamente.");
+          return;
+        }
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({
+          orientation: "landscape",
+          unit: "pt",
+          format: "a4",
+        });
+
+        const tabla = document.querySelector("#table-container table");
+        if (!tabla) {
+          alert("No hay tabla para exportar.");
+          return;
+        }
+
+        const fechaInicio =
+          document.getElementById("fecha-ventas")?.value ||
+          "Fecha inicio no seleccionada";
+        const fechaFin =
+          document.getElementById("fecha-final")?.value ||
+          "Fecha final no seleccionada";
+
+        const filas = Array.from(tabla.querySelectorAll("tr"));
+        const headRows = [];
+        const bodyRows = [];
+        let inHeader = true;
+
+        for (const fila of filas) {
+          const row = [];
+          for (const cell of fila.children) {
+            const colspan = parseInt(cell.getAttribute("colspan") || "1");
+            const text = cell.innerText.trim();
+            for (let i = 0; i < colspan; i++) {
+              row.push(i === 0 ? text : "");
+            }
+          }
+
+          if (inHeader && fila.querySelectorAll("th").length > 0) {
+            headRows.push(row);
+          } else {
+            inHeader = false;
+            bodyRows.push(row);
+          }
+        }
+
+        // Dibujar encabezado solo en la primera hoja
+        const marginLeft = 40;
+        const headerStartY = 40;
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(14);
+        doc.setTextColor(40);
+        doc.text(
+          "CUADRO DE BENEFICIOS POR PROVEEDOR - CALZADOS BREOGÁN, S.L.",
+          marginLeft,
+          headerStartY
+        );
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+        doc.text(
+          `Fechas seleccionadas: ${fechaInicio} a ${fechaFin}`,
+          marginLeft,
+          headerStartY + 20
+        );
+
+        // Dibujar tabla dejando espacio para el encabezado solo en la primera página
+        doc.autoTable({
+          head: headRows,
+          body: bodyRows,
+          startY: headerStartY + 40,
+          margin: { left: marginLeft, right: marginLeft },
+          theme: "grid",
+          styles: {
+            fontSize: 6,
+            cellPadding: 2,
+            overflow: "linebreak",
+          },
+          headStyles: {
+            fillColor: [230, 230, 230],
+            textColor: 20,
+            fontSize: 7,
+          },
+        });
+
+        doc.save("cuadro-beneficios.pdf");
+      }
+    </script>
+  </head>
+  <body>
+    <div class="container">
+      <!--<h1>CENTRAL CALZADOS BREOGÁN</h1>-->
+      <h1>TIENDA OUTLETSHOES</h1>
+
+      <div
+        class="button-group"
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        "
+      >
+        <!-- Izquierda -->
+        <div style="display: flex; align-items: center">
+          <div style="display: flex; flex-direction: column">
+            <label
+              for="fecha-ventas"
+              id="fetch-json"
+              style="
+                cursor: pointer;
+                padding: 10px 15px;
+                font-size: 16px;
+                background-color: #ccc;
+                color: black;
+                border-radius: 5px;
+                width: fit-content;
+              "
+            >
+              Indicar fechas para obtener las ventas realizadas por la tienda
+            </label>
+
+            <div
+              style="
+                margin-top: 10px;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+              "
+            >
+              <label for="fecha-inicial" style="font-weight: bold"
+                >Fecha inicial:</label
+              >
+              <input
+                type="date"
+                id="fecha-ventas"
+                style="padding: 6px; font-size: 14px"
+              />
+
+              <label for="fecha-final" style="font-weight: bold"
+                >Fecha final:</label
+              >
+              <input
+                type="date"
+                id="fecha-final"
+                style="padding: 6px; font-size: 14px"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Derecha -->
+        <div
+          style="
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 10px;
+          "
+        >
+          <!-- Grupo de botones principales -->
+          <div
+            class="button-group"
+            style="
+              display: flex;
+              gap: 10px;
+              justify-content: flex-end;
+              width: 100%;
+            "
+          >
+            <button
+              id="btn-consulta"
+              class="benefits-button"
+              style="background-color: orange"
+            >
+              Consulta
+            </button>
+            <button id="fetch-report" class="report-button">Existencias</button>
+            <button id="btn-historico" class="benefits-button">
+              Histórico
+            </button>
+            <button
+              id="btn-catalog"
+              class="benefits-button"
+              style="background-color: #9f66ad"
+            >
+              Catálogo</button
+            ><!-- Mi codigo -->
+            <!-- Mi codigo -->
+
+            <!--<button id="btn-beneficios" class="benefits-button" style="background-color: #444;">Informe por Proveedores</button>-->
+            <!--<button id="btn-beneficios-temporadas" class="benefits-button" style="background-color: #444;">Informe por Temporadas</button>-->
+            <!--<button id="btn-cierres-caja" class="benefits-button" style="background-color: #444;">Cierres de Caja</button>-->
+          </div>
+
+          <!-- Botones de exportación en una línea nueva -->
+          <div
+            id="gr-btns-bot"
+            style="
+              display: flex;
+              justify-content: flex-end;
+              gap: 10px;
+              width: 100%;
+            "
+          >
+            <!-- <button class="btn-bot" onclick="imprimirTicket()">
+              Imprimir Artículos Vendidos
+            </button>
+            <button class="btn-bot" onclick="exportarTablaAExcel()">
+              Exportar a Excel
+            </button>
+            <button class="btn-bot" onclick="exportarTablaAPDF()">
+              Exportar a PDF
+            </button> -->
+          </div>
+        </div>
+      </div>
+
+      <div id="filtros-temporada" style="margin: 15px 0"></div>
+      <div id="table-container">Click para obtener los registros...</div>
+    </div>
+
+    <script>
+      // URL de tu API Gateway
+      const lambdaApiUrl =
+        "https://8dgylecuve.execute-api.eu-west-1.amazonaws.com/BreoganStocks/ventas?tienda=T2";
+      const specificApiUrl = "https://abincodigital.loclx.io/stock";
+      const specificApiUrlHistorico =
+        "https://abincodigital.loclx.io/historico";
+      const specificApiUrlExistencias =
+        "https://abincodigital.loclx.io/existencias";
+      const specificApiUrlHistoricoStocks =
+        "https://abincodigital.loclx.io/historico-stocks";
+      // No se utiliza
+      const specificApiUrlConsulta = "https://abincodigital.loclx.io/consulta";
+
+      // Elementos del DOM
+      const fetchButton = document.getElementById("fetch-json");
+      const reportButton = document.getElementById("fetch-report");
+      const tableContainer = document.getElementById("table-container");
+      // No se utiliza
+      const catalogbutton = document.getElementById("btn-catalog"); //Mi codigo
+
+      //funcion para esperar imgenes del contenedor //Mi codigo
+      function esperarImagenesCargadas(contenedor) {
+        const imagenes = contenedor.querySelectorAll("img");
+        const promesas = Array.from(imagenes).map((img) => {
+          if (img.complete && img.naturalHeight !== 0) return Promise.resolve();
+          return new Promise((resolve) => {
+            img.onload = img.onerror = resolve;
+          });
+        });
+        return Promise.all(promesas);
+      }
+
+      function generarBotonesAcciones() {
+  const contenedor = document.getElementById("gr-btns-bot");
+
+  // Si ya están generados, no los duplicamos
+  if (contenedor.querySelector(".btn-bot")) return;
+
+  // Crear botón Imprimir
+  const btnImprimir = document.createElement("button");
+  btnImprimir.textContent = "Imprimir Artículos Vendidos";
+  btnImprimir.className = "btn-bot";
+  btnImprimir.onclick = imprimirTicket;
+
+  // Crear botón Exportar a Excel
+  const btnExcel = document.createElement("button");
+  btnExcel.textContent = "Exportar a Excel";
+  btnExcel.className = "btn-bot";
+  btnExcel.onclick = exportarTablaAExcel;
+
+  // Crear botón Exportar a PDF
+  const btnPDF = document.createElement("button");
+  btnPDF.textContent = "Exportar a PDF";
+  btnPDF.className = "btn-bot";
+  btnPDF.onclick = exportarTablaAPDF;
+
+  // Agregar botones al contenedor
+  contenedor.appendChild(btnImprimir);
+  contenedor.appendChild(btnExcel);
+  contenedor.appendChild(btnPDF);
+}
+
+      /*
+        // Función para obtener ventas realizadas
+        async function fetchLambdaResult() {
+            try {
+                tableContainer.innerHTML = "Obteniendo registros...";
+                const response = await fetch(lambdaApiUrl, {
+                    method: 'GET'
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Error: ${response.statusText}`);
+                }
+
+                const jsonData = await response.json();
+
+                // Procesar solo el campo "data"
+                if (jsonData.data && Array.isArray(jsonData.data)) {
+                    renderTable(jsonData.data);
+                } else {
+                    tableContainer.innerHTML = '<p class="error">No "data" field found in the response or data is not an array.</p>';
+                }
+            } catch (error) {
+                tableContainer.innerHTML = `<p class="error">Error fetching data: ${error.message}</p>`;
+            }
+        }
+
+    */
+
+      /**
+       *& Tabla "Existencias" */
+      // Función para generar un informe
+      async function generateReport() {
+        try {
+          const proveedor = (
+            prompt(
+              "Introduce los 3 caracteres identificativos del proveedor:"
+            ) || ""
+          )
+            .trim()
+            .toUpperCase();
+          if (!proveedor || proveedor.trim() === "") {
+            document.getElementById("filtros-temporada").innerHTML = "";
+            tableContainer.innerHTML =
+              '<p class="error">Informe cancelado. No se proporcionó un proveedor.</p>';
+            return;
+          }
+
+          tableContainer.innerHTML = "Obteniendo registros...";
+          const response = await fetch(
+            `${specificApiUrlExistencias}?proveedor=${proveedor}`,
+            {
+              method: "GET",
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error(`Error: ${response.statusText}`);
+          }
+
+          const jsonData = await response.json();
+
+          // Procesar solo el campo "data"
+          if (jsonData.data && Array.isArray(jsonData.data)) {
+            renderTableExistencias(jsonData.data);
+          } else {
+            tableContainer.innerHTML =
+              '<p class="error">No "data" field found in the response or data is not an array.</p>';
+          }
+
+          // Generar botones de exportación si no existe.
+          generarBotonesAcciones()
+
+          const exportBtn = document.getElementById("btn-export-pdf");
+          if (exportBtn) exportBtn.remove(); // 👈 elimina el botón después de generar el PDF
+        } catch (error) {
+          tableContainer.innerHTML = `<p class="error">Error fetching data: ${error.message}</p>`;
+        }
+      }
+
+      /**
+       *^ Tabla principal con rango de fechas */
+      // Función para renderizar la tabla con múltiples registros
+      function renderTable(data) {
+        document.getElementById("filtros-temporada").innerHTML = "";
+        if (!data || !Array.isArray(data)) {
+          tableContainer.innerHTML =
+            '<p class="error">Invalid "data" field.</p>';
+          return;
+        }
+
+        // Crear la tabla con encabezados fijos
+        let tableHtml = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>REFERENCIA</th>
+                            <th>DESCRIPCION</th>
+                            <th>TALLA</th>
+                            <th>COLOR</th>                            
+                            <th>UNIDADES</th>
+                            <th>TOTAL</th>
+                            <th></th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+        // Iterar sobre cada registro y agregarlo como una fila
+        data.forEach((record, index) => {
+          tableHtml += `
+                    <tr id="row-${index}">
+                        <td class="referencia-cell" data-referencia="${
+                          record.REFERENCIA
+                        }">${record.REFERENCIA}</td>
+                        <td>${record.DESCRIPCION}</td>
+                        <td>${record.TALLA}</td>
+                        <td>${record.COLOR}</td>
+                        <td>${record.UNIDADES}</td>
+                        <td>${(parseFloat(record.TOTAL) || 0).toFixed(2)}</td>
+                        <td><button class="button_stock" onclick="showDetailsStocks('${
+                          record.REFERENCIA
+                        }', ${index})">Stocks</button></td>
+                        <td><button class="button_ventas" onclick="showDetailsHistorico('${
+                          record.REFERENCIA
+                        }', ${index})">Ventas</button></td>
+                    </tr>
+                `;
+        });
+
+        // Cerrar la tabla
+        tableHtml += `
+                    </tbody>
+                </table>
+                <div id="resumenFormasPago" class="mt-4"></div>
+            `;
+
+        // Agregar la tabla al contenedor
+        let filtrosHtml = `
+    <strong>Filtrar por temporada:</strong>
+    <label><input type="checkbox" value="V25" onchange="filtrarPorTemporada()"> V25</label>
+    <label><input type="checkbox" value="V14" onchange="filtrarPorTemporada()"> V14</label>
+`;
+        //document.getElementById("filtros-temporada").innerHTML = filtrosHtml;
+        tableContainer.innerHTML = tableHtml;
+
+        // Agregar evento de doble clic a cada referencia
+        const referenciaCells = document.querySelectorAll(".referencia-cell");
+        referenciaCells.forEach((cell) => {
+          cell.addEventListener("dblclick", function () {
+            const referencia = this.getAttribute("data-referencia");
+            showArticuloImage(referencia); // Llamar a la función para obtener la imagen
+          });
+        });
+      }
+
+      // Función para renderizar la tabla de existencias
+      let existenciasOriginales = [];
+
+      /**
+       *? Tabla "Ventas" Nueva */
+
+      function renderTableExistencias(data) {
+        setTimeout(() => {
+          generarCheckboxTemporadas();
+        }, 100);
+
+        if (!data || !Array.isArray(data)) {
+          tableContainer.innerHTML =
+            '<p class="error">Invalid "data" field.</p>';
+          return;
+        }
+
+        // Obtener proveedores únicos
+        const proveedoresUnicos = Array.from(
+          new Set(data.map((item) => item.PROVEEDOR).filter(Boolean))
+        );
+
+        // Determinar qué columnas de tallas tienen al menos un valor distinto de 0.0
+        const columnasConDatos = new Set();
+
+        // Campos fijos que siempre mostraremos
+        const camposFijos = [
+          "CODARTICULO",
+          "REFERENCIA",
+          "DESCRIPCION",
+          "TOTAL",
+          "PVP",
+          "TEMPORADA",
+        ];
+
+        // Analizar todas las columnas de tallas (T18 a T48)
+        for (let i = 18; i <= 48; i++) {
+          const columna = `T${i}`;
+          const tieneDatos = data.some(
+            (item) => item[columna] !== 0.0 && item[columna] !== null
+          );
+          if (tieneDatos) {
+            columnasConDatos.add(columna);
+          }
+        }
+
+        // Ordenar las columnas con datos numéricamente
+        const columnasOrdenadas = Array.from(columnasConDatos).sort((a, b) => {
+          const numA = parseInt(a.substring(1));
+          const numB = parseInt(b.substring(1));
+          return numA - numB;
+        });
+
+        // Crear una fila superior de título
+        const filaProveedor = `
+        <tr>
+            <td colspan="${
+              camposFijos.length + columnasOrdenadas.length + 1
+            }" style="font-weight: bold; background-color: #f0f0f0; padding: 10px; text-align: left;">
+                EXISTENCIAS DEL PROVEEDOR: ${proveedoresUnicos.join(", ")}
+            </td>
+        </tr>
+    `;
+
+        // Crear los encabezados de las columnas
+        let headers = camposFijos
+          .map(
+            (campo) =>
+              `<th style="font-size: 12px">${
+                campo === "CODARTICULO"
+                  ? "CODIGO"
+                  : campo === "REFERENCIA"
+                  ? "REF"
+                  : campo === "DESCRIPCION"
+                  ? "DESCRIPCIÓN"
+                  : campo
+              }</th>`
+          )
+          .join("");
+
+        // Añadir encabezados de tallas con datos
+        headers += columnasOrdenadas
+          .map((col) => `<th style="font-size: 12px">${col.substring(1)}</th>`)
+          .join("");
+
+        // Añadir columna de acciones
+        headers += `<th style="font-size: 12px"></th>`;
+
+        // Crear la tabla con encabezados fijos
+        let tableHtml = `
+       <table>
+            <thead>
+                ${filaProveedor}
+                <tr>
+                    ${headers}
+                </tr>
+            </thead>
+        <tbody>
+    `;
+
+        // Iterar sobre cada registro y agregarlo como una fila
+        data.forEach((record, index) => {
+          let row = camposFijos
+            .map((campo) => {
+              if (campo === "CODARTICULO" || campo === "REFERENCIA") {
+                return `<td style="font-size: 10px">${record[campo]}</td>`;
+              } else if (campo === "DESCRIPCION") {
+                return `<td style="font-size: 10px">${record[campo]}</td>`;
+              } else {
+                return `<td style="font-size: 10px">${record[campo]}</td>`;
+              }
+            })
+            .join("");
+
+          // Añadir celdas de tallas con datos
+          row += columnasOrdenadas
+            .map((col) => {
+              const valor = record[col];
+              return `<td style="font-size: 10px; background-color: ${
+                valor !== null && valor !== 0 ? "yellow" : "transparent"
+              }; 
+                    color: ${
+                      valor !== null && valor !== 0 ? "black" : "black"
+                    };">
+                    ${valor === null || valor === 0 ? "" : valor}
+                </td>`;
+            })
+            .join("");
+
+          // Añadir botón de acciones
+          row += `<td><button class="button_stock" onclick="showDetailsStocks('${record.REFERENCIA}', ${index})">Stocks</button></td>`;
+
+          tableHtml += `<tr id="existencia-row-${index}">${row}</tr>`;
+        });
+
+        // Cerrar la tabla
+        tableHtml += `
+            </tbody>
+        </table>
+    `;
+
+        // Agregar la tabla al contenedor
+        let filtrosHtml = `
+        <strong>Filtrar por temporada:</strong>
+        <label><input type="checkbox" value="V25" onchange="filtrarPorTemporada()"> V25</label>
+        <label><input type="checkbox" value="V14" onchange="filtrarPorTemporada()"> V14</label>
+    `;
+        document.getElementById("filtros-temporada").innerHTML = filtrosHtml;
+        tableContainer.innerHTML = tableHtml;
+      }
+
+      /**
+       *? Tabla "Stocks" Nueva */
+
+      async function showDetailsStocks(referencia, index) {
+        const detailsRowId = `details-row-${index}`;
+        let detailsRow = document.getElementById(detailsRowId);
+
+        // Verificar si ya existe la fila de detalles
+        if (document.getElementById(detailsRowId)) {
+          const existingRow = document.getElementById(detailsRowId);
+          existingRow.style.display =
+            existingRow.style.display === "none" ? "table-row" : "none";
+          return;
+        }
+
+        // Crear/mostrar fila de carga
+        if (detailsRow) {
+          detailsRow.innerHTML = `<td colspan="7">Cargando stock actual...</td>`;
+        } else {
+          const mainRow =
+            document.getElementById(`row-${index}`) ||
+            document.getElementById(`existencia-row-${index}`);
+          detailsRow = document.createElement("tr");
+          detailsRow.id = detailsRowId;
+          detailsRow.className = "details-row";
+          detailsRow.innerHTML = `<td colspan="7">Cargando stock actual...</td>`;
+          mainRow.insertAdjacentElement("afterend", detailsRow);
+        }
+
+        try {
+          const apiUrl = `${specificApiUrl}?referencia=${referencia}`;
+          const response = await fetch(apiUrl, { method: "GET" });
+
+          if (!response.ok) {
+            throw new Error(`Error: ${response.statusText}`);
+          }
+
+          const result = await response.json();
+          const data_detail = result.data_detail;
+
+          // Paso 1: Identificar tallas con stock
+          const tallasConStock = new Set();
+
+          data_detail.forEach((record) => {
+            for (const [key, value] of Object.entries(record)) {
+              if (key.startsWith("T") && key.length === 3 && value > 0) {
+                tallasConStock.add(key);
+              }
+            }
+          });
+
+          // Convertir a array y ordenar las tallas
+          const tallasMostrar = Array.from(tallasConStock).sort((a, b) => {
+            const numA = parseInt(a.substring(1));
+            const numB = parseInt(b.substring(1));
+            return numA - numB;
+          });
+
+          // Paso 2: Construir HTML dinámico
+          let detailsHtml = `
+            <table>
+                <thead>
+                    <tr>
+                        <th style="font-size: 12px">STOCK TIENDAS</th>
+        `;
+
+          // Agregar solo las columnas de tallas con stock
+          tallasMostrar.forEach((talla) => {
+            detailsHtml += `<th style="font-size: 12px">${talla.substring(
+              1
+            )}</th>`;
+          });
+
+          detailsHtml += `
+                        <th style="font-size: 12px">TOTAL</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+          // Renderizar los datos
+          data_detail.forEach((record) => {
+            detailsHtml += `<tr><td style="font-size: 12px">${record.TIENDA}</td>`;
+
+            // Solo mostrar las tallas con stock
+            tallasMostrar.forEach((talla) => {
+              const value = record[talla];
+              detailsHtml += `
+                    <td style="font-size: 10px; 
+                              background-color: ${
+                                value > 0 ? "yellow" : "transparent"
+                              }; 
+                              color: black;">
+                        ${value > 0 ? value : ""}
+                    </td>
+                `;
+            });
+
+            detailsHtml += `<td style="font-size: 10px">${record.TOTAL}</td></tr>`;
+          });
+
+          detailsHtml += `</tbody></table>`;
+
+          // Actualizar la fila con la tabla de detalles
+          detailsRow.innerHTML = `<td colspan="8">${detailsHtml}</td>`;
+        } catch (error) {
+          detailsRow.innerHTML = `<td colspan="8" class="error"> Error al cargar el stock actual: ${error.message}</td>`;
+        }
+      }
+
+      /**
+       *? Tabla "Ventas" Nuevo */
+
+      async function showDetailsHistorico(referencia, index) {
+        const detailsRowId = `details-historico-${index}`;
+        let detailsRow = document.getElementById(detailsRowId);
+
+        // Verificar si ya existe la fila de detalles
+        if (document.getElementById(detailsRowId)) {
+          const existingRow = document.getElementById(detailsRowId);
+          existingRow.style.display =
+            existingRow.style.display === "none" ? "table-row" : "none";
+          return;
+        }
+
+        // Preparar la fila de detalles
+        if (detailsRow) {
+          detailsRow.innerHTML = `<td colspan="7">Cargando histórico...</td>`;
+        } else {
+          const mainRow = document.getElementById(`row-${index}`);
+          detailsRow = document.createElement("tr");
+          detailsRow.id = detailsRowId;
+          detailsRow.className = "details-row";
+          detailsRow.innerHTML = `<td colspan="7">Cargando histórico...</td>`;
+          mainRow.insertAdjacentElement("afterend", detailsRow);
+        }
+
+        try {
+          const apiUrl = `${specificApiUrlHistorico}?referencia=${referencia}`;
+          const response = await fetch(apiUrl, { method: "GET" });
+
+          if (!response.ok) {
+            throw new Error(`Error: ${response.statusText}`);
+          }
+
+          const result = await response.json();
+          const data_detail = result.data_detail;
+
+          // Paso 1: Identificar qué columnas tienen datos (excluyendo ceros)
+          const columnasConDatos = new Set();
+
+          data_detail.forEach((record) => {
+            for (let i = 18; i <= 48; i++) {
+              const columna = `T${i}`;
+              if (record[columna] !== null && record[columna] !== 0) {
+                columnasConDatos.add(columna);
+              }
+            }
+          });
+
+          // Convertir a array y ordenar
+          const columnasMostrar = Array.from(columnasConDatos).sort((a, b) => {
+            return parseInt(a.substring(1)) - parseInt(b.substring(1));
+          });
+
+          // Paso 2: Construir los headers de la tabla dinámicamente
+          let headersHtml = `
+            <table>
+                <thead>
+                    <tr>
+                        <th style="font-size: 12px">VENTAS TIENDAS</th>
+        `;
+
+          // Agregar solo las columnas con datos
+          columnasMostrar.forEach((col) => {
+            const tallaNum = col.substring(1);
+            headersHtml += `<th style="font-size: 12px">${tallaNum}</th>`;
+          });
+
+          headersHtml += `<th style="font-size: 12px">TOTAL</th></tr></thead><tbody>`;
+
+          // Paso 3: Construir las filas de datos
+          let detailsHtml = headersHtml;
+
+          data_detail.forEach((record) => {
+            detailsHtml += `<tr><td style="font-size: 12px">${record.TIENDA}</td>`;
+
+            // Solo agregar celdas para columnas con datos
+            columnasMostrar.forEach((col) => {
+              const valor = record[col];
+              // Determinar estilo según el valor
+              const estilo =
+                valor === 0
+                  ? "font-size: 10px; background-color: transparent; color: black;"
+                  : "font-size: 10px; background-color: #90EE90; color: black;";
+
+              // Mostrar valor solo si no es 0
+              const contenido = valor === 0 ? "" : valor;
+
+              detailsHtml += `
+                    <td style="${estilo}">
+                        ${contenido}
+                    </td>
+                `;
+            });
+
+            detailsHtml += `<td style="font-size: 10px">${record.TOTAL}</td></tr>`;
+          });
+
+          detailsHtml += `</tbody></table>`;
+
+          // Actualizar la fila con la tabla de detalles optimizada
+          detailsRow.innerHTML = `<td colspan="8">${detailsHtml}</td>`;
+        } catch (error) {
+          detailsRow.innerHTML = `<td colspan="8" class="error">Error al cargar el stock actual: ${error.message}</td>`;
+        }
+      }
+
+      // Eventos
+      //fetchButton.addEventListener('click', fetchLambdaResult);
+      reportButton.addEventListener("click", generateReport);
+
+      document.addEventListener("DOMContentLoaded", () => {
+        const fechaInput = document.getElementById("fecha-ventas");
+        const fechaFinalInput = document.getElementById("fecha-final");
+        const tableContainer = document.getElementById("table-container");
+
+        fechaInput.addEventListener("change", obtenerVentasPorRango);
+        fechaFinalInput.addEventListener("change", obtenerVentasPorRango);
+
+        async function obtenerVentasPorRango() {
+          const rawFechaInicio = fechaInput.value;
+          const rawFechaFin = fechaFinalInput.value;
+
+          if (!rawFechaInicio || !rawFechaFin) {
+            tableContainer.innerHTML =
+              "<p class='error'>Selecciona ambas fechas: inicial y final.</p>";
+            return;
+          }
+
+          const fechaInicio = fechaInput.value;
+          const fechaFin = fechaFinalInput.value;
+
+          const url = `https://abincodigital.loclx.io/ventas?tienda=T4&fechaini=${encodeURIComponent(
+            fechaInicio
+          )}&fechafin=${encodeURIComponent(fechaFin)}`;
+
+          tableContainer.innerHTML = "Obteniendo registros...";
+
+          try {
+            const response = await fetch(url);
+            if (!response.ok)
+              throw new Error("Error en la respuesta del servidor.");
+            const jsonData = await response.json();
+
+            if (jsonData.data && Array.isArray(jsonData.data)) {
+              renderTable(jsonData.data);
+              cargarResumenFormasPago();
+            } else {
+              tableContainer.innerHTML =
+                "<p class='error'>No se encontraron ventas en ese rango de fechas.</p>";
+            }
+          } catch (error) {
+            tableContainer.innerHTML = `<p class='error'>${error.message}</p>`;
+          }
+        }
+      });
+
+      function filtrarPorTemporada() {
+        const checkboxes = document.querySelectorAll(
+          '#filtros-temporada input[type="checkbox"]'
+        );
+        const seleccionadas = Array.from(checkboxes)
+          .filter((chk) => chk.checked)
+          .map((chk) => chk.value.trim().toUpperCase());
+
+        const tabla = document.querySelector("#table-container table");
+        if (!tabla) return;
+
+        const filas = tabla.querySelectorAll("tbody tr");
+
+        filas.forEach((fila) => {
+          const celdas = fila.querySelectorAll("td");
+          let temporadaTexto = "";
+          celdas.forEach((celda, i) => {
+            const encabezado = tabla
+              .querySelectorAll("th")
+              [i].innerText.trim()
+              .toUpperCase();
+            if (encabezado === "TEMPORADA") {
+              temporadaTexto = celda.innerText.trim().toUpperCase();
+            }
+          });
+
+          const coincide =
+            seleccionadas.length === 0 ||
+            seleccionadas.includes(temporadaTexto);
+          fila.style.display = coincide ? "" : "none";
+        });
+      }
+
+      function generarCheckboxTemporadas() {
+        const tabla = document.querySelector("#table-container table");
+        if (!tabla) return;
+
+        const filas = tabla.querySelectorAll("tbody tr");
+        const headers = Array.from(tabla.querySelectorAll("thead th")).map(
+          (th) => th.innerText.trim().toUpperCase()
+        );
+        const idxTemporada = headers.indexOf("TEMPORADA");
+        if (idxTemporada === -1) return;
+
+        const temporadasUnicas = new Set();
+        filas.forEach((fila) => {
+          const celdas = fila.querySelectorAll("td");
+          const temporada = (celdas[idxTemporada]?.innerText || "")
+            .trim()
+            .toUpperCase();
+          if (temporada) {
+            temporadasUnicas.add(temporada);
+          }
+        });
+
+        const contenedor = document.getElementById("filtros-temporada");
+        if (!contenedor) return;
+
+        contenedor.innerHTML = "<strong>Filtrar por temporada:</strong><br>";
+        [...temporadasUnicas].sort().forEach((temp) => {
+          const id = "chk_" + temp.replace(/\s+/g, "_");
+          const checked = temp === "V24" || temp === "V25" ? "checked" : "";
+          contenedor.innerHTML += `
+            <label style="margin-right: 10px;">
+                <input type="checkbox" value="${temp}" onchange="filtrarPorTemporada()" ${checked}> ${temp}
+            </label>
+        `;
+        });
+
+        // Aplicar filtro automáticamente
+        filtrarPorTemporada();
+      }
+
+      function exportarTablaAExcel() {
+        const tabla = document.querySelector("#table-container table");
+        if (!tabla) return alert("No hay tabla para exportar.");
+
+        let csv = [];
+        for (let fila of tabla.rows) {
+          let row = [];
+          for (let celda of fila.cells) {
+            row.push('"' + celda.innerText.replace(/"/g, '""') + '"');
+          }
+          csv.push(row.join(","));
+        }
+
+        const blob = new Blob([csv.join("\n")], {
+          type: "text/csv;charset=utf-8;",
+        });
+        const url = URL.createObjectURL(blob);
+
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "existencias.csv";
+        link.click();
+      }
+
+      document.getElementById("fetch-json").addEventListener("click", () => {
+        const fechaInput = document.getElementById("fecha-ventas");
+        const tableContainer = document.getElementById("table-container");
+
+        if (!fechaInput.value) {
+          tableContainer.innerHTML =
+            "<p class='error'>Selecciona una fecha antes de continuar.</p>";
+        }
+      });
+
+      async function fetchCuadroBeneficios() {
+        const tableContainer = document.getElementById("table-container");
+        document.getElementById("filtros-temporada").innerHTML = "";
+
+        const fechaInicioRaw = document.getElementById("fecha-ventas").value;
+        const fechaFinRaw = document.getElementById("fecha-final").value;
+
+        if (!fechaInicioRaw || !fechaFinRaw) {
+          tableContainer.innerHTML =
+            "<p class='error'>Selecciona ambas fechas: inicial y final.</p>";
+          return;
+        }
+
+        // Formatear fechas como dd/mm/yyyy
+        const [yi, mi, di] = fechaInicioRaw.split("-");
+        const [yf, mf, df] = fechaFinRaw.split("-");
+        const fechaInicio = `${di}/${mi}/${yi}`;
+        const fechaFin = `${df}/${mf}/${yf}`;
+
+        const url = `https://abincodigital.loclx.io/cuadrobeneficios?fechaini=${encodeURIComponent(
+          fechaInicio
+        )}&fechafin=${encodeURIComponent(fechaFin)}`;
+
+        try {
+          tableContainer.innerHTML =
+            "Obteniendo datos del informe por Proveedores...";
+
+          const response = await fetch(url);
+          if (!response.ok) {
+            throw new Error(`Error: ${response.statusText}`);
+          }
+
+          const jsonData = await response.json();
+
+          if (jsonData.data && Array.isArray(jsonData.data)) {
+            renderTableCuadroBeneficios(jsonData.data);
+          } else {
+            tableContainer.innerHTML =
+              "<p class='error'>No se encontraron datos válidos en la respuesta.</p>";
+          }
+        } catch (error) {
+          tableContainer.innerHTML = `<p class='error'>Error al obtener el cuadro de beneficios: ${error.message}</p>`;
+        }
+      }
+
+      async function fetchCuadroBeneficiosTemporadas() {
+        const tableContainer = document.getElementById("table-container");
+        document.getElementById("filtros-temporada").innerHTML = "";
+
+        const fechaInicioRaw = document.getElementById("fecha-ventas").value;
+        const fechaFinRaw = document.getElementById("fecha-final").value;
+
+        if (!fechaInicioRaw || !fechaFinRaw) {
+          tableContainer.innerHTML =
+            "<p class='error'>Selecciona ambas fechas: inicial y final.</p>";
+          return;
+        }
+
+        // Formatear fechas como dd/mm/yyyy
+        const [yi, mi, di] = fechaInicioRaw.split("-");
+        const [yf, mf, df] = fechaFinRaw.split("-");
+        const fechaInicio = `${di}/${mi}/${yi}`;
+        const fechaFin = `${df}/${mf}/${yf}`;
+
+        const url = `https://abincodigital.loclx.io/cuadrobeneficiostemporadas?fechaini=${encodeURIComponent(
+          fechaInicio
+        )}&fechafin=${encodeURIComponent(fechaFin)}`;
+
+        try {
+          tableContainer.innerHTML =
+            "Obteniendo datos del informe por Temporadas...";
+
+          const response = await fetch(url);
+          if (!response.ok) {
+            throw new Error(`Error: ${response.statusText}`);
+          }
+
+          const jsonData = await response.json();
+
+          if (jsonData.data && Array.isArray(jsonData.data)) {
+            renderTableCuadroBeneficiosTemporadas(jsonData.data);
+          } else {
+            tableContainer.innerHTML =
+              "<p class='error'>No se encontraron datos válidos en la respuesta.</p>";
+          }
+        } catch (error) {
+          tableContainer.innerHTML = `<p class='error'>Error al obtener el infome por Temporadas: ${error.message}</p>`;
+        }
+      }
+
+      async function fetchCierresCaja() {
+        const tableContainer = document.getElementById("table-container");
+
+        const fechaInicioRaw = document.getElementById("fecha-ventas").value;
+        const fechaFinRaw = document.getElementById("fecha-final").value;
+
+        if (!fechaInicioRaw || !fechaFinRaw) {
+          tableContainer.innerHTML =
+            "<p class='error'>Selecciona ambas fechas: inicial y final.</p>";
+          return;
+        }
+
+        // Formatear fechas como dd/mm/yyyy
+        const [yi, mi, di] = fechaInicioRaw.split("-");
+        const [yf, mf, df] = fechaFinRaw.split("-");
+        const fechaInicio = `${di}/${mi}/${yi}`;
+        const fechaFin = `${df}/${mf}/${yf}`;
+
+        const url = `https://abincodigital.loclx.io/cierresdecaja?fechaini=${encodeURIComponent(
+          fechaInicio
+        )}&fechafin=${encodeURIComponent(fechaFin)}`;
+
+        try {
+          tableContainer.innerHTML =
+            "Obteniendo datos de los cierres de caja...";
+
+          const response = await fetch(url);
+          if (!response.ok) {
+            throw new Error(`Error: ${response.statusText}`);
+          }
+
+          const jsonData = await response.json();
+
+          if (jsonData.data && Array.isArray(jsonData.data)) {
+            renderTableCierresCaja(jsonData.data);
+          } else {
+            tableContainer.innerHTML =
+              "<p class='error'>No se encontraron datos válidos en la respuesta.</p>";
+          }
+        } catch (error) {
+          tableContainer.innerHTML = `<p class='error'>Error al obtener el infome de Cierres de Caja: ${error.message}</p>`;
+        }
+      }
+
+      //document.getElementById("btn-beneficios").addEventListener("click", fetchCuadroBeneficios);
+      //document.getElementById("btn-beneficios-temporadas").addEventListener("click", fetchCuadroBeneficiosTemporadas);
+
+      function renderTableCuadroBeneficios(data) {
+        if (!Array.isArray(data) || data.length === 0) {
+          document.getElementById("table-container").innerHTML =
+            "<p>No hay datos para mostrar.</p>";
+          return;
+        }
+
+        let tableHtml = `
+        <table>
+            <thead>
+                <!--<tr>
+                    <th colspan="9">CUADRO DE MANDOS POR PROVEEDOR</th>
+                </tr>
+                <tr>
+                    <th rowspan="2">PROVEEDOR</th>
+                    <th colspan="3" style="text-align: center;">COMPRAS</th>
+                    <th colspan="3" style="text-align: center;">VENTAS</th>
+                    <th colspan="2" style="text-align: center;">EXISTENCIAS</th>
+                </tr>-->
+                <tr>
+                    <th>PROVEEDOR</th>
+                    <th style="text-align: right;">UDC</th>
+                    <th style="text-align: right;">COMPRA</th>
+                    <th style="text-align: right;">PMC</th>
+                    <th style="text-align: right;">UDV</th>
+                    <th style="text-align: right;">VENTA</th>
+                    <th style="text-align: right;">PMV</th>
+                    <th style="text-align: right;">STOCK</th>
+                    <th style="text-align: right;">VALORACIÓN</th>
+                    <th style="text-align: right;">COSTO VENTA</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${data
+                  .map(
+                    (row) => `
+                    <tr>
+                        <td>${row.PROVEEDOR}</td>
+                        <td style="text-align: right;">${
+                          row.UNIDADESCOMPRADAS ?? 0
+                        }</td>
+                        <td style="text-align: right;">${
+                          row.VALORCOMPRA ?? 0
+                        }</td>
+                        <td style="text-align: right;">${row.PMC ?? 0}</td>
+                        <td style="text-align: right;">${
+                          row.UNIDADESVENDIDAS ?? 0
+                        }</td>
+                        <td style="text-align: right;">${
+                          row.VALORVENTA ?? 0
+                        }</td>
+                        <td style="text-align: right;">${row.PMV ?? 0}</td>
+                        <td style="text-align: right;">${row.STOCK ?? 0}</td>
+                        <td style="text-align: right;">${
+                          row.VALORACION ?? 0
+                        }</td>
+                        <td style="text-align: right;">${
+                          row.COSTO_VTA ?? 0
+                        }</td>
+                    </tr>
+                `
+                  )
+                  .join("")}
+            </tbody>
+            <tfoot>
+                <tr style="background-color: #f2f2f2; color: #333; font-weight: bold;">
+                    <td><strong>Total</strong></td>
+                    <td style="text-align: right;" id="total-compradas"></td>
+                    <td style="text-align: right;" id="total-valor-compra"></td>
+                    <td style="text-align: right;" id="total-pmc"></td>
+                    <td style="text-align: right;" id="total-vendidas"></td>
+                    <td style="text-align: right;" id="total-valor-venta"></td>
+                    <td style="text-align: right;" id="total-pmv"></td>
+                    <td style="text-align: right;" id="total-stock"></td> 
+                    <td style="text-align: right;" id="total-valoracion"></td> 
+                    <td style="text-align: right;" id="total-coste-venta"></td> 
+                </tr>
+            </tfoot>
+        </table>
+    `;
+
+        document.getElementById("filtros-temporada").innerHTML = "";
+        document.getElementById("table-container").innerHTML = tableHtml;
+
+        function getNumericValue(cell) {
+          const value = parseFloat(
+            cell.textContent.replace(",", ".").replace(/[^0-9.-]/g, "")
+          );
+          return isNaN(value) ? 0 : value;
+        }
+
+        let totalCompradas = 0;
+        let totalValorCompra = 0;
+        let totalVendidas = 0;
+        let totalValorVenta = 0;
+        let totalStock = 0;
+        let totalValoracion = 0;
+        let totalCosteVenta = 0;
+
+        const rows = document.querySelectorAll("table tbody tr");
+
+        rows.forEach((row) => {
+          const cells = row.querySelectorAll("td");
+          totalCompradas += getNumericValue(cells[1]);
+          totalValorCompra += getNumericValue(cells[2]);
+          totalVendidas += getNumericValue(cells[4]);
+          totalValorVenta += getNumericValue(cells[5]);
+          totalStock += getNumericValue(cells[7]);
+          totalValoracion += getNumericValue(cells[8]);
+          totalCosteVenta += getNumericValue(cells[9]);
+        });
+
+        document.getElementById("total-compradas").textContent = totalCompradas;
+        document.getElementById("total-valor-compra").textContent =
+          totalValorCompra.toFixed(2);
+        document.getElementById("total-vendidas").textContent = totalVendidas;
+        document.getElementById("total-valor-venta").textContent =
+          totalValorVenta.toFixed(2);
+        document.getElementById("total-stock").textContent = totalStock;
+        document.getElementById("total-valoracion").textContent =
+          totalValoracion.toFixed(2);
+        document.getElementById("total-coste-venta").textContent =
+          totalCosteVenta.toFixed(2);
+
+        const pmc = totalCompradas ? totalValorCompra / totalCompradas : 0;
+        const pmv = totalVendidas ? totalValorVenta / totalVendidas : 0;
+
+        document.getElementById("total-pmc").textContent = pmc.toFixed(2);
+        document.getElementById("total-pmv").textContent = pmv.toFixed(2);
+      }
+
+      function renderTableCuadroBeneficiosTemporadas(data) {
+        if (!Array.isArray(data) || data.length === 0) {
+          document.getElementById("table-container").innerHTML =
+            "<p>No hay datos para mostrar.</p>";
+          return;
+        }
+
+        let tableHtml = `
+        <table>
+            <thead>
+                <!--<tr>
+                    <th colspan="9">INFORME POR TEMPORADAS</th>
+                </tr>
+                <tr>
+                    <th rowspan="2">TEMPORADA</th>
+                    <th colspan="3" style="text-align: center;">COMPRAS</th>
+                    <th colspan="3" style="text-align: center;">VENTAS</th>
+                    <th colspan="2" style="text-align: center;">EXISTENCIAS</th>
+                </tr>-->
+                <tr>
+                    <th>TEMPORADA</th>
+                    <th style="text-align: right;">UDC</th>
+                    <th style="text-align: right;">COMPRA</th>
+                    <th style="text-align: right;">PMC</th>
+                    <th style="text-align: right;">UDV</th>
+                    <th style="text-align: right;">VENTA</th>
+                    <th style="text-align: right;">PMV</th>
+                    <th style="text-align: right;">STOCK</th>
+                    <th style="text-align: right;">VALORACIÓN</th>
+                    <th style="text-align: right;">COSTO VENTA</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${data
+                  .map(
+                    (row) => `
+                    <tr>
+                        <td>${row.TEMPORADA}</td>
+                        <td style="text-align: right;">${
+                          row.UNIDADESCOMPRADAS ?? 0
+                        }</td>
+                        <td style="text-align: right;">${
+                          row.VALORCOMPRA ?? 0
+                        }</td>
+                        <td style="text-align: right;">${row.PMC ?? 0}</td>
+                        <td style="text-align: right;">${
+                          row.UNIDADESVENDIDAS ?? 0
+                        }</td>
+                        <td style="text-align: right;">${
+                          row.VALORVENTA ?? 0
+                        }</td>
+                        <td style="text-align: right;">${row.PMV ?? 0}</td>
+                        <td style="text-align: right;">${row.STOCK ?? 0}</td>
+                        <td style="text-align: right;">${
+                          row.VALORACION ?? 0
+                        }</td>
+                        <td style="text-align: right;">${
+                          row.COSTO_VTA ?? 0
+                        }</td>
+                    </tr>
+                `
+                  )
+                  .join("")}
+            </tbody>
+            <tfoot>
+                <tr style="background-color: #f2f2f2; color: #333; font-weight: bold;">
+                    <td><strong>Total</strong></td>
+                    <td style="text-align: right;" id="total-compradas"></td>
+                    <td style="text-align: right;" id="total-valor-compra"></td>
+                    <td style="text-align: right;" id="total-pmc"></td>
+                    <td style="text-align: right;" id="total-vendidas"></td>
+                    <td style="text-align: right;" id="total-valor-venta"></td>
+                    <td style="text-align: right;" id="total-pmv"></td>
+                    <td style="text-align: right;" id="total-stock"></td> 
+                    <td style="text-align: right;" id="total-valoracion"></td> 
+                    <td style="text-align: right;" id="total-coste-venta"></td> 
+                </tr>
+            </tfoot>
+        </table>
+    `;
+
+        document.getElementById("filtros-temporada").innerHTML = "";
+        document.getElementById("table-container").innerHTML = tableHtml;
+
+        function getNumericValue(cell) {
+          const value = parseFloat(
+            cell.textContent.replace(",", ".").replace(/[^0-9.-]/g, "")
+          );
+          return isNaN(value) ? 0 : value;
+        }
+
+        let totalCompradas = 0;
+        let totalValorCompra = 0;
+        let totalVendidas = 0;
+        let totalValorVenta = 0;
+        let totalStock = 0;
+        let totalValoracion = 0;
+        let totalCosteVenta = 0;
+
+        const rows = document.querySelectorAll("table tbody tr");
+
+        rows.forEach((row) => {
+          const cells = row.querySelectorAll("td");
+          totalCompradas += getNumericValue(cells[1]);
+          totalValorCompra += getNumericValue(cells[2]);
+          totalVendidas += getNumericValue(cells[4]);
+          totalValorVenta += getNumericValue(cells[5]);
+          totalStock += getNumericValue(cells[7]);
+          totalValoracion += getNumericValue(cells[8]);
+          totalCosteVenta += getNumericValue(cells[9]);
+        });
+
+        document.getElementById("total-compradas").textContent = totalCompradas;
+        document.getElementById("total-valor-compra").textContent =
+          totalValorCompra.toFixed(2);
+        document.getElementById("total-vendidas").textContent = totalVendidas;
+        document.getElementById("total-valor-venta").textContent =
+          totalValorVenta.toFixed(2);
+        document.getElementById("total-stock").textContent = totalStock;
+        document.getElementById("total-valoracion").textContent =
+          totalValoracion.toFixed(2);
+        document.getElementById("total-coste-venta").textContent =
+          totalCosteVenta.toFixed(2);
+
+        const pmc = totalCompradas ? totalValorCompra / totalCompradas : 0;
+        const pmv = totalVendidas ? totalValorVenta / totalVendidas : 0;
+
+        document.getElementById("total-pmc").textContent = pmc.toFixed(2);
+        document.getElementById("total-pmv").textContent = pmv.toFixed(2);
+      }
+
+      function renderTableCierresCaja(data) {
+        if (!Array.isArray(data) || data.length === 0) {
+          document.getElementById("table-container").innerHTML =
+            "<p>No hay datos para mostrar.</p>";
+          return;
+        }
+
+        let tableHtml = `
+        <table>
+            <thead>
+                <!--<tr>
+                    <th colspan="9">CIERRES DE CAJA DIARIOS</th>
+                </tr>-->
+                <tr>
+                    <th rowspan="1"></th>
+                    <th colspan="3" style="text-align: center; background-color: #cfdc32;">BREOGAN</th>
+                    <th colspan="3" style="text-align: center; background-color: #48ccfd;">HEBER</th>
+                    <th colspan="3" style="text-align: center; background-color: #00f307;">ELENA</th>
+                    <th colspan="3" style="text-align: center; background-color: #f480fd;">OUTLET</th>
+                    <th colspan="3" style="text-align: center; background-color: #000000; color: white;">TOTAL</th>
+                </tr>
+                <tr>
+                    <th>FECHA</th>
+                    <th style="text-align: right; background-color: #cfdc32;">EFECTIVO</th>
+                    <th style="text-align: right; background-color: #cfdc32;">TARJETA</th>
+                    <th style="text-align: right; background-color: #cfdc32;">TOTAL</th>
+                    <th style="text-align: right; background-color: #48ccfd;">EFECTIVO</th>
+                    <th style="text-align: right; background-color: #48ccfd;">TARJETA</th>
+                    <th style="text-align: right; background-color: #48ccfd;">TOTAL</th>
+                    <th style="text-align: right; background-color: #00f307;">EFECTIVO</th>
+                    <th style="text-align: right; background-color: #00f307;">TARJETA</th>
+                    <th style="text-align: right; background-color: #00f307;">TOTAL</th>
+                    <th style="text-align: right; background-color: #f480fd;">EFECTIVO</th>
+                    <th style="text-align: right; background-color: #f480fd;">TARJETA</th>
+                    <th style="text-align: right; background-color: #f480fd;">TOTAL</th>
+                    <th style="text-align: right; background-color: #000000; color: white;">EFECTIVO</th>
+                    <th style="text-align: right; background-color: #000000; color: white;">TARJETA</th>
+                    <th style="text-align: right; background-color: #000000; color: white;">TOTAL</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${data
+                  .map(
+                    (row) => `
+                    <tr>
+                        <td>${row.FECHA}</td>
+                        <td style="text-align: right;">${(
+                          parseFloat(row.Z01_EFECTIVO) || 0
+                        ).toFixed(2)}</td>
+                        <td style="text-align: right;">${(
+                          parseFloat(row.Z01_TARJETA) || 0
+                        ).toFixed(2)}</td>
+                        <td style="text-align: right;">${(
+                          parseFloat(row.Z01_TOTAL) || 0
+                        ).toFixed(2)}</td>
+                        <td style="text-align: right;">${(
+                          parseFloat(row.Z02_EFECTIVO) || 0
+                        ).toFixed(2)}</td>
+                        <td style="text-align: right;">${(
+                          parseFloat(row.Z02_TARJETA) || 0
+                        ).toFixed(2)}</td>
+                        <td style="text-align: right;">${(
+                          parseFloat(row.Z02_TOTAL) || 0
+                        ).toFixed(2)}</td>
+                        <td style="text-align: right;">${(
+                          parseFloat(row.Z03_EFECTIVO) || 0
+                        ).toFixed(2)}</td>
+                        <td style="text-align: right;">${(
+                          parseFloat(row.Z03_TARJETA) || 0
+                        ).toFixed(2)}</td>
+                        <td style="text-align: right;">${(
+                          parseFloat(row.Z03_TOTAL) || 0
+                        ).toFixed(2)}</td>
+                        <td style="text-align: right;">${(
+                          parseFloat(row.Z04_EFECTIVO) || 0
+                        ).toFixed(2)}</td>
+                        <td style="text-align: right;">${(
+                          parseFloat(row.Z04_TARJETA) || 0
+                        ).toFixed(2)}</td>
+                        <td style="text-align: right;">${(
+                          parseFloat(row.Z04_TOTAL) || 0
+                        ).toFixed(2)}</td>
+                        <td style="text-align: right;">${(
+                          parseFloat(row.Z0_EFECTIVO) || 0
+                        ).toFixed(2)}</td>
+                        <td style="text-align: right;">${(
+                          parseFloat(row.Z0_TARJETA) || 0
+                        ).toFixed(2)}</td>
+                        <td style="text-align: right;">${(
+                          parseFloat(row.Z0_TOTAL) || 0
+                        ).toFixed(2)}</td>
+                    </tr>
+                `
+                  )
+                  .join("")}
+            </tbody>
+            <tfoot>
+                <tr style="background-color: #f2f2f2; color: #333; font-weight: bold;">
+                    <td><strong>TOTAL</strong></td>
+                    <td style="text-align: right;" id="total-efectivo-z01"></td>
+                    <td style="text-align: right;" id="total-tarjeta-z01"></td>
+                    <td style="text-align: right;" id="total-z01"></td>
+                    <td style="text-align: right;" id="total-efectivo-z02"></td>
+                    <td style="text-align: right;" id="total-tarjeta-z02"></td>
+                    <td style="text-align: right;" id="total-z02"></td>
+                    <td style="text-align: right;" id="total-efectivo-z03"></td> 
+                    <td style="text-align: right;" id="total-tarjeta-z03"></td> 
+                    <td style="text-align: right;" id="total-z03"></td> 
+                    <td style="text-align: right;" id="total-efectivo-z04"></td> 
+                    <td style="text-align: right;" id="total-tarjeta-z04"></td> 
+                    <td style="text-align: right;" id="total-z04"></td> 
+                    <td style="text-align: right;" id="total-efectivo-z0"></td> 
+                    <td style="text-align: right;" id="total-tarjeta-z0"></td> 
+                    <td style="text-align: right;" id="total-z0"></td> 
+                </tr>
+            </tfoot>
+        </table>
+    `;
+
+        document.getElementById("table-container").innerHTML = tableHtml;
+
+        function getNumericValue(cell) {
+          const value = parseFloat(
+            cell.textContent.replace(",", ".").replace(/[^0-9.-]/g, "")
+          );
+          return isNaN(value) ? 0 : value;
+        }
+
+        let totalEfectivoZ01 = 0;
+        let totalTarjetaZ01 = 0;
+        let totalZ01 = 0;
+        let totalEfectivoZ02 = 0;
+        let totalTarjetaZ02 = 0;
+        let totalZ02 = 0;
+        let totalEfectivoZ03 = 0;
+        let totalTarjetaZ03 = 0;
+        let totalZ03 = 0;
+        let totalEfectivoZ04 = 0;
+        let totalTarjetaZ04 = 0;
+        let totalZ04 = 0;
+        let totalEfectivoZ0 = 0;
+        let totalTarjetaZ0 = 0;
+        let totalZ0 = 0;
+
+        const rows = document.querySelectorAll("table tbody tr");
+
+        rows.forEach((row) => {
+          const cells = row.querySelectorAll("td");
+          totalEfectivoZ01 += getNumericValue(cells[1]);
+          totalTarjetaZ01 += getNumericValue(cells[2]);
+          totalZ01 += getNumericValue(cells[3]);
+          totalEfectivoZ02 += getNumericValue(cells[4]);
+          totalTarjetaZ02 += getNumericValue(cells[5]);
+          totalZ02 += getNumericValue(cells[6]);
+          totalEfectivoZ03 += getNumericValue(cells[7]);
+          totalTarjetaZ03 += getNumericValue(cells[8]);
+          totalZ03 += getNumericValue(cells[9]);
+          totalEfectivoZ04 += getNumericValue(cells[10]);
+          totalTarjetaZ04 += getNumericValue(cells[11]);
+          totalZ04 += getNumericValue(cells[12]);
+          totalEfectivoZ0 += getNumericValue(cells[13]);
+          totalTarjetaZ0 += getNumericValue(cells[14]);
+          totalZ0 += getNumericValue(cells[15]);
+        });
+
+        document.getElementById("total-efectivo-z01").textContent =
+          totalEfectivoZ01.toFixed(2);
+        document.getElementById("total-tarjeta-z01").textContent =
+          totalTarjetaZ01.toFixed(2);
+        document.getElementById("total-z01").textContent = totalZ01.toFixed(2);
+        document.getElementById("total-efectivo-z02").textContent =
+          totalEfectivoZ02.toFixed(2);
+        document.getElementById("total-tarjeta-z02").textContent =
+          totalTarjetaZ02.toFixed(2);
+        document.getElementById("total-z02").textContent = totalZ02.toFixed(2);
+        document.getElementById("total-efectivo-z03").textContent =
+          totalEfectivoZ03.toFixed(2);
+        document.getElementById("total-tarjeta-z03").textContent =
+          totalTarjetaZ03.toFixed(2);
+        document.getElementById("total-z03").textContent = totalZ03.toFixed(2);
+        document.getElementById("total-efectivo-z04").textContent =
+          totalEfectivoZ04.toFixed(2);
+        document.getElementById("total-tarjeta-z04").textContent =
+          totalTarjetaZ04.toFixed(2);
+        document.getElementById("total-z04").textContent = totalZ04.toFixed(2);
+        document.getElementById("total-efectivo-z0").textContent =
+          totalEfectivoZ0.toFixed(2);
+        document.getElementById("total-tarjeta-z0").textContent =
+          totalTarjetaZ0.toFixed(2);
+        document.getElementById("total-z0").textContent = totalZ0.toFixed(2);
+      }
+
+      document
+        .getElementById("btn-historico")
+        .addEventListener("click", generateHistoricoStock);
+
+      async function generateHistoricoStock() {
+        const referencia = prompt(
+          "Introduce la referencia o código de barras del artículo:"
+        ).toUpperCase();
+        if (!referencia || referencia.trim() === "") {
+          tableContainer.innerHTML =
+            '<p class="error">Operación cancelada. No se proporcionó una referencia.</p>';
+          return;
+        }
+
+        tableContainer.innerHTML =
+          "Obteniendo histórico de movimientos de stock...";
+
+        try {
+          const response = await fetch(
+            `${specificApiUrlHistoricoStocks}?referencia=${referencia}`,
+            {
+              method: "GET",
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error(`Error: ${response.statusText}`);
+          }
+
+          const jsonData = await response.json();
+
+          lastHistoricoData = jsonData.data;
+
+          if (jsonData.data && Array.isArray(jsonData.data)) {
+            renderHistoricoStock(jsonData.data);
+          } else {
+            tableContainer.innerHTML =
+              '<p class="error">No se encontraron datos para esa referencia.</p>';
+          }
+
+          // Generar botones de exportación si no existe.
+          generarBotonesAcciones()
+
+          const exportBtn = document.getElementById("btn-export-pdf");
+          if (exportBtn) exportBtn.remove(); // 👈 elimina el botón después de generar el PDF
+        } catch (error) {
+          tableContainer.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+        }
+      }
+
+      function renderHistoricoStock(data) {
+        if (!Array.isArray(data) || data.length === 0) {
+          document.getElementById("table-container").innerHTML =
+            "<p class='error'>No hay datos para mostrar.</p>";
+          return;
+        }
+
+        // Detectar columnas base y columnas de talla
+        const columnasFijas = ["MOVIMIENTO", "TIENDA", "FECHA"];
+        const todasColumnas = Object.keys(data[0]);
+        const columnasTalla = todasColumnas.filter(
+          (c) =>
+            ![
+              "FECHA",
+              "REFPROVEEDOR",
+              "DESCRIPCION",
+              "COLOR",
+              "TIENDA",
+              "MOVIMIENTO",
+            ].includes(c)
+        );
+
+        // Filtro de tallas
+        const checkboxesTallas = document.querySelectorAll(".tallaCheckbox");
+        const tallasSeleccionadas = Array.from(checkboxesTallas)
+          .filter((cb) => cb.checked)
+          .map((cb) => cb.value);
+
+        const columnasFiltradas = columnasTalla.filter(
+          (talla) =>
+            tallasSeleccionadas.length === 0 ||
+            tallasSeleccionadas.includes(talla)
+        );
+
+        // Filtro de tiendas
+        const checkboxesTiendas = document.querySelectorAll(".tiendaCheckbox");
+        const tiendasSeleccionadas = Array.from(checkboxesTiendas)
+          .filter((cb) => cb.checked)
+          .map((cb) => cb.value);
+
+        const datosFiltrados = data.filter(
+          (row) =>
+            tiendasSeleccionadas.length === 0 ||
+            tiendasSeleccionadas.includes(row.TIENDA)
+        );
+
+        datosFiltrados.sort((a, b) => {
+          const movA = (a.MOVIMIENTO || "").toUpperCase();
+          const movB = (b.MOVIMIENTO || "").toUpperCase();
+          if (movA < movB) return -1;
+          if (movA > movB) return 1;
+
+          const tiendaA = (a.TIENDA || "").toUpperCase();
+          const tiendaB = (b.TIENDA || "").toUpperCase();
+          if (tiendaA < tiendaB) return -1;
+          if (tiendaA > tiendaB) return 1;
+
+          const fechaA = new Date(a.FECHA.split("/").reverse().join("-"));
+          const fechaB = new Date(b.FECHA.split("/").reverse().join("-"));
+          return fechaB - fechaA; // más reciente primero
+        });
+
+        let leyendaHtml = `
+        <div style="margin-bottom: 10px; font-size: 12px;">
+            <strong>Leyenda de colores:</strong>
+            <div style="display: flex; gap: 20px; margin-top: 5px;">
+                <div><span style="display: inline-block; width: 15px; height: 15px; background-color: #d0f0c0; border: 1px solid #ccc;"></span> Venta</div>
+                <div><span style="display: inline-block; width: 15px; height: 15px; background-color: #fda28f; border: 1px solid #ccc;"></span> Recepción de Mercancía</div>
+                <div><span style="display: inline-block; width: 15px; height: 15px; background-color: #fffacd; border: 1px solid #ccc;"></span> Regularización</div>
+                <div><span style="display: inline-block; width: 15px; height: 15px; background-color: #e0f7fa; border: 1px solid #ccc;"></span> Traspasos</div>
+            </div>
+        </div>
+    `;
+
+        // Construcción de tabla
+        let tableHtml = `<table><thead><tr>`;
+
+        // Fila de título
+        const referencia = data[0].REFPROVEEDOR || "";
+        const descripcion = data[0].DESCRIPCION || "";
+        const color = data[0].COLOR || "";
+        tableHtml += `<tr><td colspan="${
+          columnasFijas.length + columnasFiltradas.length
+        }" style="font-weight: bold; text-align: left; padding: 10px; background-color: black; color: white;">${referencia} - ${descripcion} - ${color}</td></tr>`;
+
+        columnasFijas.forEach((col) => {
+          tableHtml += `<th style="font-size: 12px">${col}</th>`;
+        });
+        columnasFiltradas.forEach((talla) => {
+          tableHtml += `<th style="font-size: 12px">${talla}</th>`;
+        });
+        tableHtml += `</tr></thead><tbody>`;
+
+        // Filas
+        datosFiltrados.forEach((row) => {
+          tableHtml += `<tr>`;
+          columnasFijas.forEach((col) => {
+            tableHtml += `<td style="font-size: 10px">${row[col] || ""}</td>`;
+          });
+          columnasFiltradas.forEach((talla) => {
+            const valor = row[talla];
+            const destacado = valor !== null && valor !== 0;
+            const esVenta = row["MOVIMIENTO"] === "VENTA";
+            const esRegularizacion = row["MOVIMIENTO"] === "REGULARIZACIÓN";
+            const esRecepcion = row["MOVIMIENTO"] === "RECEPCIÓN DE MERCANCÍA";
+            const colorFondo = destacado
+              ? esVenta
+                ? "#d0f0c0" // verde claro para ventas
+                : esRegularizacion
+                ? "#fffacd" // amarillo claro para regularizaciones
+                : esRecepcion
+                ? "#fda28f" // rojo claro para recepciones
+                : "#e0f7fa" // azul claro para otros
+              : "transparent";
+
+            tableHtml += `<td style="font-size: 10px; background-color: ${colorFondo};">${
+              valor === 0 || valor === null ? "" : valor
+            }</td>`;
+          });
+          tableHtml += `</tr>`;
+        });
+
+        tableHtml += `</tbody></table>`;
+        document.getElementById("table-container").innerHTML =
+          leyendaHtml + tableHtml;
+      }
+
+      function generarCheckboxTallas(data) {
+        const tallasUnicas = new Set();
+        data.forEach((record) => {
+          if (record.TALLA) {
+            tallasUnicas.add(record.TALLA);
+          }
+        });
+
+        const contenedor = document.getElementById("filtros-temporada");
+        if (!contenedor) return;
+
+        contenedor.innerHTML = "<strong>Filtrar por talla:</strong><br>";
+        [...tallasUnicas].sort().forEach((talla) => {
+          const id = "chk_" + talla.replace(/\s+/g, "_");
+          contenedor.innerHTML += `
+            <label style="margin-right: 10px;">
+                <input type="checkbox" value="${talla}" onchange="filtrarPorTalla()"> ${talla}
+            </label>
+        `;
+        });
+      }
+
+      function filtrarPorTalla() {
+        const checkboxes = document.querySelectorAll(
+          '#filtros-temporada input[type="checkbox"]'
+        );
+        const seleccionadas = Array.from(checkboxes)
+          .filter((chk) => chk.checked)
+          .map((chk) => chk.value.trim());
+
+        const tabla = document.querySelector("#table-container table");
+        if (!tabla) return;
+
+        const filas = tabla.querySelectorAll("tbody tr");
+
+        filas.forEach((fila) => {
+          const talla = fila.cells[3]?.innerText.trim();
+          const coincide =
+            seleccionadas.length === 0 || seleccionadas.includes(talla);
+          fila.style.display = coincide ? "" : "none";
+        });
+      }
+
+      function formatearFecha(fechaISO) {
+        const fecha = new Date(fechaISO);
+        const dia = String(fecha.getDate()).padStart(2, "0");
+        const mes = String(fecha.getMonth() + 1).padStart(2, "0"); // Los meses empiezan en 0
+        const anio = fecha.getFullYear();
+        return `${dia}/${mes}/${anio}`;
+      }
+
+      document
+        .getElementById("btn-consulta")
+        .addEventListener("click", async () => {
+          const referencia = prompt(
+            "Introduce la referencia o código de barras del artículo:"
+          ).toUpperCase();
+          if (!referencia || referencia.trim() === "") {
+            tableContainer.innerHTML =
+              '<p class="error">Consulta cancelada. No se proporcionó una referencia.</p>';
+            return;
+          }
+
+          tableContainer.innerHTML = "Consultando stocks y ventas...";
+
+          try {
+            const response = await fetch(
+              `https://abincodigital.loclx.io/consulta?referencia=${referencia}`
+            );
+            if (!response.ok) throw new Error("Error al obtener los datos");
+
+            const result = await response.json();
+
+            // Mostrar ambos bloques
+            tableContainer.innerHTML = `
+            <h2>Stock por tienda</h2>
+            ${renderMiniTable(result.stock, "stock")}
+
+            <h2>Histórico de Ventas</h2>
+            ${renderMiniTable(result.historico, "ventas")}
+        `;
+
+        // Generar botones de exportación si no existe.
+        generarBotonesAcciones()
+
+        const exportBtn = document.getElementById("btn-export-pdf");
+        if (exportBtn) exportBtn.remove(); // 👈 elimina el botón después de generar el PDF
+          } catch (error) {
+            tableContainer.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+          }
+        });
+
+      /*
+      document
+        .getElementById("btn-catalog")
+        .addEventListener("click", async () => {
+          // Paso 1: Preguntar tipo de búsqueda
+          const tipo = prompt(
+            "¿Buscar por TEMPORADA o por PROVEEDOR? (T/P)"
+          ).toUpperCase();
+
+          if (tipo !== "T" && tipo !== "P") {
+            tableContainer.innerHTML = `<p class="error">Consulta cancelada. Opción no válida.</p>`;
+            return;
+          }
+
+          // Paso 2: Pedir valor de búsqueda
+          const valor = prompt(
+            tipo === "T"
+              ? "Introduce código de la temporada:"
+              : "Introduce código del proveedor:"
+          )?.toUpperCase();
+
+          if (!valor || valor.trim() === "") {
+            tableContainer.innerHTML =
+              '<p class="error">Consulta cancelada. No se proporcionó un valor.</p>';
+            return;
+          }
+
+          tableContainer.innerHTML = "Cargando imágenes del catálogo...";
+
+          // Paso 3: Construir URL según el tipo
+          const endpoint =
+            tipo === "T"
+              ? `https://abincodigital.loclx.io/catalogo-temporada?referencia=${valor}`
+              : `https://abincodigital.loclx.io/catalogo-proveedor?proveedor=${valor}`;
+
+          // Paso 4: Petición al backend
+          try {
+            const response = await fetch(endpoint);
+            if (!response.ok) throw new Error("Error al obtener las imágenes");
+
+            const result = await response.json();
+
+            tableContainer.innerHTML = `
+              <h2 id="title-catalogo">
+                Catálogo de imágenes por ${
+                  tipo === "T" ? "temporada" : "proveedor"
+                }: ${valor}
+              </h2>
+              ${renderCatalogo(result.data)}
+            `;
+          } catch (error) {
+            tableContainer.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+          }
+        });
+*/
+
+      document.getElementById("btn-catalog").addEventListener("click", () => {
+        // Si ya existe el modal, no lo volvemos a crear
+        if (document.getElementById("catalog-modal")) return;
+
+        const contenedor = document.getElementById("gr-btns-bot");
+        const btnsExport = document.querySelectorAll(".btn-bot");
+        contenedor.innerHTML = "";
+
+
+        // Crear modal contenedor
+        const modal = document.createElement("div");
+        modal.id = "catalog-modal";
+        modal.style = `
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex; justify-content: center; align-items: center;
+    z-index: 1000;
+  `;
+
+        // Crear ventana interna
+        const modalBox = document.createElement("div");
+        modalBox.style = `
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 0 15px rgba(0,0,0,0.3);
+    text-align: center;
+    min-width: 300px;
+  `;
+        modalBox.innerHTML = `
+    <h3>¿Cómo quieres buscar el catálogo?</h3>
+    <button id="btn-temporada" style="margin: 10px; padding: 10px 20px; background-color: #5fb36d; color: white; border: none; border-radius: 6px;">Por temporada</button>
+    <button id="btn-proveedor" style="margin: 10px; padding: 10px 20px; background-color: #669fad; color: white; border: none; border-radius: 6px;">Por proveedor</button>
+  `;
+
+        modal.appendChild(modalBox);
+        document.body.appendChild(modal);
+
+        // Función reutilizable para pedir dato y llamar al backend
+        const handleSearch = async (tipo) => {
+          const etiqueta = tipo === "T" ? "temporada" : "proveedor";
+          const campo = prompt(
+            `Introduce el código de ${etiqueta}:`
+          )?.toUpperCase();
+
+          if (!campo || campo.trim() === "") {
+            tableContainer.innerHTML = `<p class="error">Consulta cancelada. No se proporcionó ${etiqueta}.</p>`;
+            document.body.removeChild(modal);
+            return;
+          }
+
+          tableContainer.innerHTML = "Cargando imágenes del catálogo...";
+
+          const url =
+            tipo === "T"
+              ? `https://abincodigital.loclx.io/catalogo-temporada?referencia=${campo}`
+              : `https://abincodigital.loclx.io/catalogo-proveedor?proveedor=${campo}`;
+
+          try {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error("Error al obtener las imágenes");
+
+            const result = await res.json();
+
+            tableContainer.innerHTML = `
+        <h2 id="title-catalogo">Catálogo por ${etiqueta}: ${campo}</h2>
+        ${renderCatalogo(result.data)}
+      `;
+
+      // MOVER ESTE BLOQUE AQUÍ, DESPUÉS DE RENDERIZAR
+const grBtnBot = document.getElementById("gr-btns-bot");
+const existingBtn = document.getElementById("btn-export-pdf");
+if (existingBtn) existingBtn.remove();
+
+const exportBtn = document.createElement("button");
+exportBtn.id = "btn-export-pdf";
+exportBtn.textContent = "Exportar catálogo";
+
+
+grBtnBot.appendChild(exportBtn);
+
+exportBtn.addEventListener("click", generarPDF);
+
+
+          } catch (err) {
+            tableContainer.innerHTML = `<p class="error">Error: ${err.message}</p>`;
+          } finally {
+            document.body.removeChild(modal); // cerrar modal al final
+          }
+        };
+
+        // Escuchar clic en los botones
+        modalBox
+          .querySelector("#btn-temporada")
+          .addEventListener("click", () => handleSearch("T"));
+        modalBox
+          .querySelector("#btn-proveedor")
+          .addEventListener("click", () => handleSearch("P"));
+      });
+
+      //función para renderizar catálogo
+      function renderCatalogo(data) {
+        if (!Array.isArray(data) || data.length === 0)
+          return "<p>Sin datos</p>";
+
+        //imagen para artículos sin foto
+        //const imagenGenerica = "./img/foto.jpg";
+        const imagenGenerica = "https://abincodigital.loclx.io/imagen-generica";
+
+        // Agrupar artículos por codarticulo
+        const articulosMap = new Map();
+
+        data.forEach((item) => {
+          const cod = item.codarticulo;
+
+          if (!articulosMap.has(cod)) {
+            articulosMap.set(cod, {
+              descripcion: item.descripcion,
+              descripcionadic: item.descripcionadic,
+              foto: item.foto,
+              tallas: new Set(),
+            });
+          }
+
+          articulosMap.get(cod).tallas.add(item.talla);
+        });
+
+
+
+        // Render catálogo como tabla visual
+        let html = `
+            <div id="galeria" style="
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                gap: 20px;
+                padding: 20px;
+            ">
+            `;
+
+        articulosMap.forEach((articulo, cod) => {
+          //Aquí usamos imagen base64 si hay, si no, usamos la imagen genérica
+          const imagenSrc = articulo.foto
+            ? `data:image/jpeg;base64,${articulo.foto}`
+            : imagenGenerica;
+
+          html += `
+        <div class="card" style="
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            padding: 5px;
+            text-align: center;
+            transition: transform 0.2s;
+            width: 250px;
+            overflow: hidden;
+        "
+        onmouseover="this.style.transform='scale(1.1)'"
+        onmouseout="this.style.transform='scale(1)'"
+        >
+            <img src="${imagenSrc}" 
+              alt="Imagen del artículo" 
+              style="
+                width: 100%; 
+                height: 200px; 
+                border-radius: 8px; 
+                object-fit: cover; 
+                max-height: 200px;">
+            
+            <h3 style="margin: 10px 0 5px;">${articulo.descripcionadic}</h3>
+            <p style="color: #666; font-size: 0.9em;">${
+              articulo.descripcion
+            }</p>
+            <div style="margin-top: 10px;">
+                <span style="font-weight: bold;">Tallas disponibles:</span><br>
+                <span style="display: inline-block; margin-top: 5px; color: #444;">
+                    ${Array.from(articulo.tallas).join(", ")}
+                </span>
+            </div>
+        </div>
+    `;
+        });
+        html += `</div>`;
+        return html;
+      }
+
+      // Se añade un listener al botón con id "btn-export-pdf"
+      async function generarPDF() {
+        try {
+          /**
+           *? Destructurar el objeto "window.jspdf". Pues jspdf.umd.min.js no deja
+           *? la clase jsPDF directamente en window, sino que deja un objeto llamado
+           *? window.jspdf */
+          const { jsPDF } = window.jspdf;
+          // Crea nuevo documento PDF en A4 vertical("p")
+          const doc = new jsPDF("p", "mm", "a4");
+          // Obtener el contenedor #galeria
+          const catalogoElement = document.getElementById("galeria");
+          if (!catalogoElement) {
+            alert("No hay catálogo cargado.");
+            return;
+          }
+
+          // Obtener todas las tarjetas y las guarda en un NodeList == Array
+          const cards = catalogoElement.querySelectorAll(".card");
+          const title = document.getElementById("title-catalogo");
+
+          // Configurar dimensiones y layout
+          const pageWidth = doc.internal.pageSize.getWidth(); // 210 mm
+          const pageHeight = doc.internal.pageSize.getHeight(); // 297 mm
+          /**
+           *! Límites de la página */
+          const margin = 5;
+          const cols = 4; // columnas por fila
+          const rows = 4; // filas por página
+
+          /**
+           *^ Se calculan las dimensiones de cada tarjeta, teniendo en cuenta
+           *^ márgenes y espaciado interno entre tarjetas
+           */ // 5 = Margen entre columnas
+          const cardWidth = (pageWidth - margin * 2 - (cols - 1) * 5) / cols;
+          const cardHeight = (pageHeight - margin * 2 - (rows - 1) * 10) / rows;
+          // 10 = Margen entre filas
+          // Variables de posición y contador
+          let x = margin; // 5mm
+          let y = margin; // 5mm
+          let col = 0;
+          let row = 0;
+          let padding = 0.5;
+          // Pie de página
+          let count = 1;
+
+          // Fecha actual, formato de España
+          const fecha = new Date().toLocaleDateString("es-ES");
+
+          // Añadir encabezado SOLO en la primera página
+          doc.setFontSize(16);
+          doc.text(title.innerText, margin, 12);
+          doc.setFontSize(10);
+          doc.text(`Fecha: ${fecha}`, margin, 18);
+
+          // Ajustar margen superior de la primera página
+          y = 20;
+
+          /**
+           *^ Se recorre cada una de las tarjetas HTML seleccionadas antes. */
+          for (let i = 0; i < cards.length; i++) {
+            // Una tarjeta en el orden del NodeList de tarjetas
+            const card = cards[i];
+            // Subelementos de cada tarjeta
+            const imgEl = card.querySelector("img");
+            const h3 = card.querySelector("h3");
+
+            /**
+             *? Si h3 es null o undefined, no lanza un error, simplemente
+             *? devuelve undefined. */
+            const cod = h3?.textContent.trim() || ""; // .trim() quita espacios
+            const desc = card.querySelector("p")?.textContent.trim() || "";
+            const tallas =
+              card.querySelector("span:last-of-type")?.textContent.trim() || "";
+
+            // Procesar imagen
+            const imgSrc = imgEl?.src || "";
+            // Comprueba si la foto está en data:image/jpeg;base64,/9j/4AAQSkZ...
+            const isBase64 = imgSrc.startsWith("data:image");
+            const finalImage = isBase64
+              ? imgSrc
+              : "https://abincodigital.loclx.io/imagen-generica";
+
+            let base64Image = finalImage;
+            if (!isBase64) {
+              base64Image = await toDataUrl(finalImage);
+            }
+
+            /**
+             *? Se inserta la imagen en la posición actual (x, y) ocupando
+             *? la mitad superior del espacio del card. */
+            const imgHeight = cardHeight * 0.6;
+            doc.addImage(
+              base64Image,
+              "JPEG",
+              x + padding,
+              y + padding,
+              cardWidth - padding * 2,
+              imgHeight - padding
+            );
+
+            // Borde con esquinas redondeadas
+            doc.setDrawColor(255, 255, 255);
+            doc.setLineWidth(1.5);
+            doc.roundedRect(x, y, cardWidth, cardHeight, 2.5, 2.5, "S");
+
+            doc.setDrawColor(237, 232, 228);
+            doc.setLineWidth(0.5);
+            doc.roundedRect(x, y, cardWidth, cardHeight, 2.5, 2.5, "S");
+
+            /**
+             *~ Se añaden tres líneas de texto debajo de la imagen
+             *~ con espaciado vertical entre ellas. */
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "bold");
+            doc.text(cod, x + padding * 3, y + imgHeight + 5, {
+              maxWidth: cardWidth - padding * 6,
+            });
+            doc.setFontSize(7);
+            doc.setFont("helvetica", "normal");
+            doc.text(desc, x + padding * 3, y + imgHeight + 12, {
+              maxWidth: cardWidth - padding * 6,
+            });
+            doc.text("Tallas: " + tallas, x + padding * 3, y + imgHeight + 19, {
+              maxWidth: cardWidth - padding * 6,
+            });
+            /**
+             ** Se avanza a la siguiente columna.
+             ** Si ya se completó una fila (col >= cols), se reinicia la columna
+             ** y se baja una fila (row++). */
+            col++;
+            if (col >= cols) {
+              col = 0;
+              row++;
+              x = margin;
+              y += cardHeight + 3;
+            } else {
+              x += cardWidth + 5;
+            }
+            /**
+             *^ Si ya se colocaron todas las filas posibles (16 tarjetas) y aún
+             *^ hay más tarjetas, se añade una nueva página. La posición se
+             *^ reinicia arriba (y = margin) porque solo la primera página tiene
+             *^ encabezado. */
+            if (row >= rows && i < cards.length - 1) {
+              doc.text(
+                "Página " + count,
+                pageWidth - margin * 3,
+                pageHeight - margin * 1.2,
+                { maxWidth: cardWidth - padding * 6 }
+              );
+              doc.addPage();
+              row = 0;
+              col = 0;
+              x = margin;
+              y = margin;
+              count++;
+            }
+          }
+
+          doc.save("catalogo_productos.pdf");
+        } catch (error) {
+          console.error("Error al generar PDF:", error);
+        }
+      }
+
+
+
+
+
+      // Utilidad: convierte imagen externa a base64
+      async function toDataUrl(url) {
+        const res = await fetch(url);
+        /**
+         * Convierte la respuesta en un Blob, es decir, en un archivo binario
+         * en memoria, que representa los datos de la imagen. */
+        const blob = await res.blob();
+        return new Promise((resolve) => {
+          /**
+           * Instanciar FileReader, que se encarga de leer archivos (como Blob)
+           * y convertirlos a texto o base64.*/
+          const reader = new FileReader();
+          // 2. Cuando termine de leer (pasar a base64)
+          reader.onloadend = () => {
+            // Devuleve el resultado de la lectura a la Promise
+            return resolve(reader.result);
+          };
+          // 1. Bianrio lo pasamos a base64
+          reader.readAsDataURL(blob);
+        });
+      }
+
+      /**
+       *? Tabla "Consulta" Nuevo */
+
+      function renderMiniTable(data, tipo = "") {
+        if (!Array.isArray(data) || data.length === 0)
+          return "<p>Sin datos</p>";
+
+        // Identificar columnas a mostrar (las que tienen al menos un valor != 0)
+        const allKeys = Object.keys(data[0]);
+        const columnsToShow = new Set();
+
+        // Siempre mostrar estas columnas
+        const mandatoryColumns = [
+          "DESCRIPCION",
+          "REFPROVEEDOR",
+          "REFERENCIA",
+          "TIENDA",
+          "TOTAL",
+        ];
+
+        // Primero añadimos las columnas obligatorias
+        mandatoryColumns.forEach((col) => {
+          if (allKeys.includes(col)) columnsToShow.add(col);
+        });
+
+        // Luego analizamos columnas de tallas (que empiezan por T seguido de número)
+        const sizeColumns = allKeys.filter((key) => /^T\d+$/.test(key));
+
+        // Verificar qué tallas tienen al menos un valor distinto de 0
+        sizeColumns.forEach((col) => {
+          const hasNonZero = data.some((item) => item[col] !== 0.0);
+          if (hasNonZero) columnsToShow.add(col);
+        });
+
+        // Convertir Set a Array para mantener orden consistente
+        const headers = allKeys.filter((key) => columnsToShow.has(key));
+
+        // Generar la tabla HTML
+        let html =
+          "<div class='table-responsive'><table class='table table-striped table-bordered'><thead><tr>";
+        headers.forEach((h) => (html += `<th>${h}</th>`));
+        html += "</tr></thead><tbody>";
+
+        data.forEach((row) => {
+          html += "<tr>";
+          headers.forEach((h) => {
+            const valor = row[h];
+            const mostrar =
+              valor === 0 || valor === null || valor === undefined ? "" : valor;
+            let bgColor = "transparent";
+
+            if (typeof valor === "number" && valor !== 0) {
+              bgColor =
+                tipo === "stock"
+                  ? "rgba(255, 255, 0, 0.3)"
+                  : tipo === "ventas"
+                  ? "rgba(144, 238, 144, 0.3)"
+                  : "transparent";
+            }
+
+            html += `<td style="background-color: ${bgColor}; color: black; text-align: center;">${mostrar}</td>`;
+          });
+          html += "</tr>";
+        });
+
+        html += "</tbody></table></div>";
+        return html;
+      }
+
+      function imprimirTicket() {
+        const tabla = document.querySelector("#table-container table");
+        if (!tabla) return alert("No hay datos para imprimir.");
+
+        const filas = Array.from(tabla.querySelectorAll("tbody tr"));
+        let html = `
+        <html>
+        <head>
+            <style>
+                body {
+                    font-family: monospace;
+                    font-size: 10px;
+                    margin: 0;
+                    padding: 10px;
+                    max-width: 80mm;
+                }
+                table {
+                    width: 100%;
+                    border-collapse: collapse;
+                }
+                th, td {
+                    padding: 4px;
+                    text-align: left;
+                    border-bottom: 1px dashed #ccc;
+                }
+                th {
+                    font-weight: bold;
+                    border-bottom: 1px solid #000;
+                }
+            </style>
+        </head>
+        <body>
+            <h3>TIENDA OUTLETSHOES</h3>
+            <p><strong>Fechas:</strong> ${
+              document.getElementById("fecha-ventas").value
+            } a ${document.getElementById("fecha-final").value}</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>REFERENCIA</th>
+                        <th>TALLA</th>
+                        <th>UNID</th>
+                        <th>IMPORTE</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+        filas.forEach((fila) => {
+          const celdas = fila.querySelectorAll("td");
+          if (celdas.length >= 6) {
+            const referencia = celdas[0].innerText;
+            const talla = celdas[2].innerText;
+            const unidades = celdas[4].innerText;
+            const importe = celdas[5].innerText;
+            html += `<tr>
+                        <td>${referencia}</td>
+                        <td>${talla}</td>
+                        <td>${unidades}</td>
+                        <td>${importe}</td>
+                    </tr>`;
+          }
+        });
+
+        html += `
+                </tbody>
+            </table>
+        </body>
+        </html>
+    `;
+
+        const printWindow = window.open("", "", "width=400,height=600");
+        printWindow.document.write(html);
+        printWindow.document.close();
+        printWindow.focus();
+        printWindow.print();
+        printWindow.close();
+      }
+
+      //document.getElementById("btn-cierres-caja").addEventListener("click", fetchCierresCaja);
+
+      function showArticuloImage(referencia) {
+        // Realizamos la petición para obtener la imagen desde la API
+        fetch(
+          `https://abincodigital.loclx.io/articulo/foto?referencia=${referencia}`
+        )
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error("Imagen no encontrada");
+            }
+
+            // Verificamos el tipo de contenido
+            const contentType = response.headers.get("Content-Type");
+            if (!contentType || !contentType.startsWith("image/")) {
+              throw new Error("La respuesta no es una imagen");
+            }
+
+            // Obtener la imagen como Blob
+            return response.blob();
+          })
+          .then((imageBlob) => {
+            // Crear una URL local para la imagen
+            const imageUrl = URL.createObjectURL(imageBlob);
+            showImageInModal(imageUrl); // Función para mostrar la imagen en un modal
+          })
+          .catch((error) => {
+            console.error("Error al cargar la imagen:", error);
+            alert("Error al cargar la imagen: " + error.message); // Mostrar el error al usuario
+          });
+      }
+
+      function showImageInModal(imageUrl) {
+        // Crear un modal para mostrar la imagen
+        const modal = document.createElement("div");
+        modal.style.position = "fixed";
+        modal.style.top = "0";
+        modal.style.left = "0";
+        modal.style.width = "100%";
+        modal.style.height = "100%";
+        modal.style.backgroundColor = "rgba(0, 0, 0, 0.7)";
+        modal.style.display = "flex";
+        modal.style.justifyContent = "center";
+        modal.style.alignItems = "center";
+        modal.style.zIndex = "1000";
+
+        const img = document.createElement("img");
+        img.src = imageUrl;
+        img.style.maxWidth = "90%";
+        img.style.maxHeight = "90%";
+
+        const closeBtn = document.createElement("button");
+        closeBtn.textContent = "Cerrar";
+        closeBtn.style.position = "absolute";
+        closeBtn.style.top = "20px";
+        closeBtn.style.right = "20px";
+        closeBtn.style.fontSize = "20px";
+        closeBtn.style.padding = "10px 20px";
+        closeBtn.style.backgroundColor = "red";
+        closeBtn.style.color = "white";
+        closeBtn.style.border = "none";
+        closeBtn.style.cursor = "pointer";
+
+        closeBtn.addEventListener("click", () => {
+          modal.remove();
+        });
+
+        modal.appendChild(img);
+        modal.appendChild(closeBtn);
+        document.body.appendChild(modal);
+      }
+
+      function cargarResumenFormasPago() {
+        const fechaInicio = document.getElementById("fecha-ventas").value;
+        const fechaFin = document.getElementById("fecha-final").value;
+
+        if (!fechaInicio || !fechaFin) {
+          document.getElementById("resumenFormasPago").innerHTML = "";
+          return;
+        }
+
+        fetch(
+          `http://abincodigital.loclx.io/formas-pago/resumen?tienda=Z04&fechaini=${fechaInicio}&fechafin=${fechaFin}`
+        )
+          .then((res) => res.json())
+          .then((data) => {
+            const resumenDiv = document.getElementById("resumenFormasPago");
+
+            if (data.error) {
+              resumenDiv.innerHTML = `<p class="text-danger">Error: ${data.error}</p>`;
+              return;
+            }
+
+            if (data.length === 0) {
+              resumenDiv.innerHTML = "<p>No hay datos de formas de pago.</p>";
+              return;
+            }
+
+            let html = "<h4>Resumen por Forma de Pago</h4>";
+            html +=
+              "<table class='table table-bordered'><thead><tr><th>Forma de Pago</th><th>Total</th></tr></thead><tbody>";
+
+            data.forEach((item) => {
+              html += `<tr><td>${
+                item.formapago
+              }</td><td>${item.total_importe.toFixed(2)}</td></tr>`;
+            });
+
+            html += "</tbody></table>";
+            resumenDiv.innerHTML = html;
+          })
+          .catch((err) => {
+            console.error("Error al cargar resumen de formas de pago:", err);
+            document.getElementById("resumenFormasPago").innerHTML =
+              "<p class='text-danger'>Error al cargar resumen</p>";
+          });
+      }
+    </script>
+  </body>
+</html>
