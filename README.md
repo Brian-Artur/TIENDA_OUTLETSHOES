@@ -15,3 +15,9 @@ pip freeze > requirements.txt
 source .venv/Scripts/activate
 python BACKEND.py
 ```
+
+## Backend en la nube 
+https://abincodigital.loclx.io
+
+## Backend en local
+http://localhost:5000

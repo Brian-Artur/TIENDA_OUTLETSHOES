@@ -363,15 +363,15 @@
       // URL de tu API Gateway
       const lambdaApiUrl =
         "https://8dgylecuve.execute-api.eu-west-1.amazonaws.com/BreoganStocks/ventas?tienda=T2";
-      const specificApiUrl = "https://abincodigital.loclx.io/stock";
+      const specificApiUrl = "http://localhost:5000/stock";
       const specificApiUrlHistorico =
-        "https://abincodigital.loclx.io/historico";
+        "http://localhost:5000/historico";
       const specificApiUrlExistencias =
-        "https://abincodigital.loclx.io/existencias";
+        "http://localhost:5000/existencias";
       const specificApiUrlHistoricoStocks =
-        "https://abincodigital.loclx.io/historico-stocks";
+        "http://localhost:5000/historico-stocks";
       // No se utiliza
-      const specificApiUrlConsulta = "https://abincodigital.loclx.io/consulta";
+      const specificApiUrlConsulta = "http://localhost:5000/consulta";
 
       // Elementos del DOM
       const fetchButton = document.getElementById("fetch-json");
@@ -942,7 +942,7 @@
           const fechaInicio = fechaInput.value;
           const fechaFin = fechaFinalInput.value;
 
-          const url = `https://abincodigital.loclx.io/ventas?tienda=T4&fechaini=${encodeURIComponent(
+          const url = `http://localhost:5000/ventas?tienda=T4&fechaini=${encodeURIComponent(
             fechaInicio
           )}&fechafin=${encodeURIComponent(fechaFin)}`;
 
@@ -1093,7 +1093,7 @@
         const fechaInicio = `${di}/${mi}/${yi}`;
         const fechaFin = `${df}/${mf}/${yf}`;
 
-        const url = `https://abincodigital.loclx.io/cuadrobeneficios?fechaini=${encodeURIComponent(
+        const url = `http://localhost:5000/cuadrobeneficios?fechaini=${encodeURIComponent(
           fechaInicio
         )}&fechafin=${encodeURIComponent(fechaFin)}`;
 
@@ -1138,7 +1138,7 @@
         const fechaInicio = `${di}/${mi}/${yi}`;
         const fechaFin = `${df}/${mf}/${yf}`;
 
-        const url = `https://abincodigital.loclx.io/cuadrobeneficiostemporadas?fechaini=${encodeURIComponent(
+        const url = `http://localhost:5000/cuadrobeneficiostemporadas?fechaini=${encodeURIComponent(
           fechaInicio
         )}&fechafin=${encodeURIComponent(fechaFin)}`;
 
@@ -1182,7 +1182,7 @@
         const fechaInicio = `${di}/${mi}/${yi}`;
         const fechaFin = `${df}/${mf}/${yf}`;
 
-        const url = `https://abincodigital.loclx.io/cierresdecaja?fechaini=${encodeURIComponent(
+        const url = `http://localhost:5000/cierresdecaja?fechaini=${encodeURIComponent(
           fechaInicio
         )}&fechafin=${encodeURIComponent(fechaFin)}`;
 
@@ -1705,6 +1705,9 @@
           // Generar botones de exportación si no existe.
           generarBotonesAcciones();
 
+        const filtros = document.querySelector("#filtros-temporada");
+        if (filtros) filtros.innerHTML = "";
+
           const exportBtn = document.getElementById("btn-export-pdf");
           if (exportBtn) exportBtn.remove(); // 👈 elimina el botón después de generar el PDF
         } catch (error) {
@@ -1906,7 +1909,7 @@
 
           try {
             const response = await fetch(
-              `https://abincodigital.loclx.io/consulta?referencia=${referencia}`
+              `http://localhost:5000/consulta?referencia=${referencia}`
             );
             if (!response.ok) throw new Error("Error al obtener los datos");
 
@@ -1920,6 +1923,10 @@
             <h2>Histórico de Ventas</h2>
             ${renderMiniTable(result.historico, "ventas")}
         `;
+
+
+        const filtros = document.querySelector("#filtros-temporada");
+        if (filtros) filtros.innerHTML = "";
 
             // Generar botones de exportación si no existe.
             generarBotonesAcciones();
@@ -2000,6 +2007,9 @@
         <h2 id="title-catalogo">Catálogo por ${etiqueta}: ${campo}</h2>
         ${renderCatalogo(result.data)}
       `;
+
+      const filtros = document.querySelector("#filtros-temporada");
+      if (filtros) filtros.innerHTML = "";
 
             // MOVER ESTE BLOQUE AQUÍ, DESPUÉS DE RENDERIZAR
             const grBtnBot = document.getElementById("gr-btns-bot");
@@ -2468,7 +2478,7 @@
       function showArticuloImage(referencia) {
         // Realizamos la petición para obtener la imagen desde la API
         fetch(
-          `https://abincodigital.loclx.io/articulo/foto?referencia=${referencia}`
+          `http://localhost:5000/articulo/foto?referencia=${referencia}`
         )
           .then((response) => {
             if (!response.ok) {
