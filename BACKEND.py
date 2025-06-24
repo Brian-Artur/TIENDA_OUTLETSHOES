@@ -318,7 +318,7 @@ def historico():
         FROM ARTICULOS A
         LEFT JOIN ARTICULOSLIN ALIN ON A.CODARTICULO = ALIN.CODARTICULO
         LEFT JOIN ALBVENTALIN AVL ON ALIN.CODARTICULO = AVL.CODARTICULO AND ALIN.TALLA = AVL.TALLA AND ALIN.COLOR = AVL.COLOR
-        LEFT JOIN ALMACEN ALM ON AVL.CODALMACEN = ALM.CODALMACEN
+        LEFT JOIN ALMAC EN ALM ON AVL.CODALMACEN = ALM.CODALMACEN
         LEFT JOIN REFERENCIASPROV RP ON A.REFPROVEEDOR = RP.REFPROVEEDOR
         WHERE A.REFPROVEEDOR = ? AND ALM.CODALMACEN IN ('T1', 'T2', 'T3', 'T4')
         GROUP BY ALM.CODALMACEN, ALM.NOMBREALMACEN, A.REFPROVEEDOR, A.TEMPORADA, ALIN.CODARTICULO, ALIN.COLOR, A.DESCRIPCION
@@ -1218,31 +1218,71 @@ def get_foto_articulo():
         return jsonify({"error": "Imagen no encontrada"}), 404, cors_headers()
 
 
-# Mi codigo
-# Función para obtener imagen según temporada
+# # Mi codigo
+# # Función para obtener imagen según temporada
+# def get_image_by_season(referencia):
+#     conn = get_connection()
+#     cursor = conn.cursor()
+#     query = """
+#         SELECT 
+#             A.CODARTICULO,
+#             A.DESCRIPCION,
+#             A.DESCRIPADIC,
+#             A.FOTO,
+#             S.TALLA,
+#             S.STOCK
+#         FROM dbo.ARTICULOS A
+#         JOIN dbo.STOCKS S ON A.CODARTICULO = S.CODARTICULO
+#         WHERE A.TEMPORADA = ? AND S.STOCK > 0
+#     """
+#     cursor.execute(query, (referencia,))
+#     rows = cursor.fetchall()
+
+#     # lista para guardar las imagenes transformadas
+#     imagenes = []
+#     if rows:
+#         for cod, desc, descadic, foto, talla, stock in rows:
+#             # Convertimos FOTO (bytes) a base64
+#             foto_b64 = base64.b64encode(foto).decode("utf-8") if foto else None
+#             imagenes.append(
+#                 {
+#                     "codarticulo": cod,
+#                     "descripcion": desc,
+#                     "descripcionadic": descadic,
+#                     "foto": foto_b64,
+#                     "talla": talla,
+#                     "stock": stock,
+#                 }
+#             )
+
+#         return imagenes
+
+
 def get_image_by_season(referencia):
     conn = get_connection()
     cursor = conn.cursor()
+
     query = """
         SELECT 
             A.CODARTICULO,
             A.DESCRIPCION,
-            A.DESCRIPADIC,
+            A.REFPROVEEDOR,
             A.FOTO,
             S.TALLA,
-            S.STOCK
+            S.STOCK,
+            PV.PBRUTO
         FROM dbo.ARTICULOS A
         JOIN dbo.STOCKS S ON A.CODARTICULO = S.CODARTICULO
+        LEFT JOIN dbo.PRECIOSVENTA PV ON A.CODARTICULO = PV.CODARTICULO AND S.TALLA = PV.TALLA
         WHERE A.TEMPORADA = ? AND S.STOCK > 0
     """
+
     cursor.execute(query, (referencia,))
     rows = cursor.fetchall()
 
-    # lista para guardar las imagenes transformadas
     imagenes = []
     if rows:
-        for cod, desc, descadic, foto, talla, stock in rows:
-            # Convertimos FOTO (bytes) a base64
+        for cod, desc, descadic, foto, talla, stock, pbruto in rows:
             foto_b64 = base64.b64encode(foto).decode("utf-8") if foto else None
             imagenes.append(
                 {
@@ -1252,10 +1292,11 @@ def get_image_by_season(referencia):
                     "foto": foto_b64,
                     "talla": talla,
                     "stock": stock,
+                    "pbruto": float(pbruto) if pbruto is not None else None,
                 }
             )
 
-        return imagenes
+    return imagenes
 
 
 # Ruta para obtener catalago imagenes
@@ -1311,6 +1352,48 @@ def get_catalogo_proveedor():
         return jsonify({"error": "No se encontraron artículos"}), 404, cors_headers()
 
 
+# def get_images_by_supplier(proveedor):
+#     conn = get_connection()
+#     cursor = conn.cursor()
+
+#     query = """
+#         SELECT 
+#             A.CODARTICULO,
+#             A.DESCRIPCION,
+#             A.DESCRIPADIC,
+#             A.FOTO,
+#             S.TALLA,
+#             S.STOCK
+#         FROM dbo.ARTICULOS A
+#         JOIN dbo.STOCKS S ON A.CODARTICULO = S.CODARTICULO
+#         WHERE 
+#             S.STOCK > 0
+#             AND (
+#                 LEFT(A.DESCRIPADIC, 3) COLLATE Modern_Spanish_CI_AS = ?
+#                 OR LEFT(A.REFPROVEEDOR, 3) COLLATE Modern_Spanish_CI_AS = ?
+#             )
+#     """
+#     cursor.execute(query, (proveedor, proveedor))
+#     rows = cursor.fetchall()
+
+#     imagenes = []
+#     if rows:
+#         for cod, desc, descadic, foto, talla, stock in rows:
+#             foto_b64 = base64.b64encode(foto).decode("utf-8") if foto else None
+#             imagenes.append(
+#                 {
+#                     "codarticulo": cod,
+#                     "descripcion": desc,
+#                     "descripcionadic": descadic,
+#                     "foto": foto_b64,
+#                     "talla": talla,
+#                     "stock": stock,
+#                 }
+#             )
+
+#     return imagenes
+
+
 def get_images_by_supplier(proveedor):
     conn = get_connection()
     cursor = conn.cursor()
@@ -1319,25 +1402,26 @@ def get_images_by_supplier(proveedor):
         SELECT 
             A.CODARTICULO,
             A.DESCRIPCION,
-            A.DESCRIPADIC,
+            A.REFPROVEEDOR,
             A.FOTO,
             S.TALLA,
-            S.STOCK
+            S.STOCK,
+            PV.PBRUTO
         FROM dbo.ARTICULOS A
         JOIN dbo.STOCKS S ON A.CODARTICULO = S.CODARTICULO
+        LEFT JOIN dbo.PRECIOSVENTA PV ON A.CODARTICULO = PV.CODARTICULO
         WHERE 
             S.STOCK > 0
             AND (
-                LEFT(A.DESCRIPADIC, 3) COLLATE Modern_Spanish_CI_AS = ?
-                OR LEFT(A.REFPROVEEDOR, 3) COLLATE Modern_Spanish_CI_AS = ?
+                LEFT(A.REFPROVEEDOR, 3) COLLATE Modern_Spanish_CI_AS = ?
             )
     """
-    cursor.execute(query, (proveedor, proveedor))
+    cursor.execute(query, (proveedor))
     rows = cursor.fetchall()
 
     imagenes = []
     if rows:
-        for cod, desc, descadic, foto, talla, stock in rows:
+        for cod, desc, descadic, foto, talla, stock, pbruto in rows:
             foto_b64 = base64.b64encode(foto).decode("utf-8") if foto else None
             imagenes.append(
                 {
@@ -1347,10 +1431,12 @@ def get_images_by_supplier(proveedor):
                     "foto": foto_b64,
                     "talla": talla,
                     "stock": stock,
+                    "pbruto": float(pbruto) if pbruto is not None else None
                 }
             )
 
     return imagenes
+
 
 
 

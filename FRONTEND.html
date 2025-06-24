@@ -356,17 +356,7 @@
               gap: 10px;
               width: 100%;
             "
-          >
-            <!-- <button class="btn-bot" onclick="imprimirTicket()">
-              Imprimir Artículos Vendidos
-            </button>
-            <button class="btn-bot" onclick="exportarTablaAExcel()">
-              Exportar a Excel
-            </button>
-            <button class="btn-bot" onclick="exportarTablaAPDF()">
-              Exportar a PDF
-            </button> -->
-          </div>
+          ></div>
         </div>
       </div>
 
@@ -408,62 +398,34 @@
       }
 
       function generarBotonesAcciones() {
-  const contenedor = document.getElementById("gr-btns-bot");
+        const contenedor = document.getElementById("gr-btns-bot");
 
-  // Si ya están generados, no los duplicamos
-  if (contenedor.querySelector(".btn-bot")) return;
+        // Si ya están generados, no los duplicamos
+        if (contenedor.querySelector(".btn-bot")) return;
 
-  // Crear botón Imprimir
-  const btnImprimir = document.createElement("button");
-  btnImprimir.textContent = "Imprimir Artículos Vendidos";
-  btnImprimir.className = "btn-bot";
-  btnImprimir.onclick = imprimirTicket;
+        // Crear botón Imprimir
+        const btnImprimir = document.createElement("button");
+        btnImprimir.textContent = "Imprimir Artículos Vendidos";
+        btnImprimir.className = "btn-bot";
+        btnImprimir.onclick = imprimirTicket;
 
-  // Crear botón Exportar a Excel
-  const btnExcel = document.createElement("button");
-  btnExcel.textContent = "Exportar a Excel";
-  btnExcel.className = "btn-bot";
-  btnExcel.onclick = exportarTablaAExcel;
+        // Crear botón Exportar a Excel
+        const btnExcel = document.createElement("button");
+        btnExcel.textContent = "Exportar a Excel";
+        btnExcel.className = "btn-bot";
+        btnExcel.onclick = exportarTablaAExcel;
 
-  // Crear botón Exportar a PDF
-  const btnPDF = document.createElement("button");
-  btnPDF.textContent = "Exportar a PDF";
-  btnPDF.className = "btn-bot";
-  btnPDF.onclick = exportarTablaAPDF;
+        // Crear botón Exportar a PDF
+        const btnPDF = document.createElement("button");
+        btnPDF.textContent = "Exportar a PDF";
+        btnPDF.className = "btn-bot";
+        btnPDF.onclick = exportarTablaAPDF;
 
-  // Agregar botones al contenedor
-  contenedor.appendChild(btnImprimir);
-  contenedor.appendChild(btnExcel);
-  contenedor.appendChild(btnPDF);
-}
-
-      /*
-        // Función para obtener ventas realizadas
-        async function fetchLambdaResult() {
-            try {
-                tableContainer.innerHTML = "Obteniendo registros...";
-                const response = await fetch(lambdaApiUrl, {
-                    method: 'GET'
-                });
-
-                if (!response.ok) {
-                    throw new Error(`Error: ${response.statusText}`);
-                }
-
-                const jsonData = await response.json();
-
-                // Procesar solo el campo "data"
-                if (jsonData.data && Array.isArray(jsonData.data)) {
-                    renderTable(jsonData.data);
-                } else {
-                    tableContainer.innerHTML = '<p class="error">No "data" field found in the response or data is not an array.</p>';
-                }
-            } catch (error) {
-                tableContainer.innerHTML = `<p class="error">Error fetching data: ${error.message}</p>`;
-            }
-        }
-
-    */
+        // Agregar botones al contenedor
+        contenedor.appendChild(btnImprimir);
+        contenedor.appendChild(btnExcel);
+        contenedor.appendChild(btnPDF);
+      }
 
       /**
        *& Tabla "Existencias" */
@@ -507,7 +469,7 @@
           }
 
           // Generar botones de exportación si no existe.
-          generarBotonesAcciones()
+          generarBotonesAcciones();
 
           const exportBtn = document.getElementById("btn-export-pdf");
           if (exportBtn) exportBtn.remove(); // 👈 elimina el botón después de generar el PDF
@@ -1751,7 +1713,7 @@
           }
 
           // Generar botones de exportación si no existe.
-          generarBotonesAcciones()
+          generarBotonesAcciones();
 
           const exportBtn = document.getElementById("btn-export-pdf");
           if (exportBtn) exportBtn.remove(); // 👈 elimina el botón después de generar el PDF
@@ -1969,71 +1931,15 @@
             ${renderMiniTable(result.historico, "ventas")}
         `;
 
-        // Generar botones de exportación si no existe.
-        generarBotonesAcciones()
+            // Generar botones de exportación si no existe.
+            generarBotonesAcciones();
 
-        const exportBtn = document.getElementById("btn-export-pdf");
-        if (exportBtn) exportBtn.remove(); // 👈 elimina el botón después de generar el PDF
+            const exportBtn = document.getElementById("btn-export-pdf");
+            if (exportBtn) exportBtn.remove();
           } catch (error) {
             tableContainer.innerHTML = `<p class="error">Error: ${error.message}</p>`;
           }
         });
-
-      /*
-      document
-        .getElementById("btn-catalog")
-        .addEventListener("click", async () => {
-          // Paso 1: Preguntar tipo de búsqueda
-          const tipo = prompt(
-            "¿Buscar por TEMPORADA o por PROVEEDOR? (T/P)"
-          ).toUpperCase();
-
-          if (tipo !== "T" && tipo !== "P") {
-            tableContainer.innerHTML = `<p class="error">Consulta cancelada. Opción no válida.</p>`;
-            return;
-          }
-
-          // Paso 2: Pedir valor de búsqueda
-          const valor = prompt(
-            tipo === "T"
-              ? "Introduce código de la temporada:"
-              : "Introduce código del proveedor:"
-          )?.toUpperCase();
-
-          if (!valor || valor.trim() === "") {
-            tableContainer.innerHTML =
-              '<p class="error">Consulta cancelada. No se proporcionó un valor.</p>';
-            return;
-          }
-
-          tableContainer.innerHTML = "Cargando imágenes del catálogo...";
-
-          // Paso 3: Construir URL según el tipo
-          const endpoint =
-            tipo === "T"
-              ? `http://localhost:5000/catalogo-temporada?referencia=${valor}`
-              : `http://localhost:5000/catalogo-proveedor?proveedor=${valor}`;
-
-          // Paso 4: Petición al backend
-          try {
-            const response = await fetch(endpoint);
-            if (!response.ok) throw new Error("Error al obtener las imágenes");
-
-            const result = await response.json();
-
-            tableContainer.innerHTML = `
-              <h2 id="title-catalogo">
-                Catálogo de imágenes por ${
-                  tipo === "T" ? "temporada" : "proveedor"
-                }: ${valor}
-              </h2>
-              ${renderCatalogo(result.data)}
-            `;
-          } catch (error) {
-            tableContainer.innerHTML = `<p class="error">Error: ${error.message}</p>`;
-          }
-        });
-*/
 
       document.getElementById("btn-catalog").addEventListener("click", () => {
         // Si ya existe el modal, no lo volvemos a crear
@@ -2042,7 +1948,6 @@
         const contenedor = document.getElementById("gr-btns-bot");
         const btnsExport = document.querySelectorAll(".btn-bot");
         contenedor.innerHTML = "";
-
 
         // Crear modal contenedor
         const modal = document.createElement("div");
@@ -2106,21 +2011,18 @@
         ${renderCatalogo(result.data)}
       `;
 
-      // MOVER ESTE BLOQUE AQUÍ, DESPUÉS DE RENDERIZAR
-const grBtnBot = document.getElementById("gr-btns-bot");
-const existingBtn = document.getElementById("btn-export-pdf");
-if (existingBtn) existingBtn.remove();
+            // MOVER ESTE BLOQUE AQUÍ, DESPUÉS DE RENDERIZAR
+            const grBtnBot = document.getElementById("gr-btns-bot");
+            const existingBtn = document.getElementById("btn-export-pdf");
+            if (existingBtn) existingBtn.remove();
 
-const exportBtn = document.createElement("button");
-exportBtn.id = "btn-export-pdf";
-exportBtn.textContent = "Exportar catálogo";
+            const exportBtn = document.createElement("button");
+            exportBtn.id = "btn-export-pdf";
+            exportBtn.textContent = "Exportar catálogo";
 
+            grBtnBot.appendChild(exportBtn);
 
-grBtnBot.appendChild(exportBtn);
-
-exportBtn.addEventListener("click", generarPDF);
-
-
+            exportBtn.addEventListener("click", generarPDF);
           } catch (err) {
             tableContainer.innerHTML = `<p class="error">Error: ${err.message}</p>`;
           } finally {
@@ -2157,14 +2059,13 @@ exportBtn.addEventListener("click", generarPDF);
               descripcion: item.descripcion,
               descripcionadic: item.descripcionadic,
               foto: item.foto,
+              pbruto: item.pbruto,
               tallas: new Set(),
             });
           }
 
           articulosMap.get(cod).tallas.add(item.talla);
         });
-
-
 
         // Render catálogo como tabla visual
         let html = `
@@ -2183,40 +2084,52 @@ exportBtn.addEventListener("click", generarPDF);
             : imagenGenerica;
 
           html += `
-        <div class="card" style="
-            background: #fff;
-            border-radius: 12px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            padding: 5px;
-            text-align: center;
-            transition: transform 0.2s;
-            width: 250px;
-            overflow: hidden;
-        "
-        onmouseover="this.style.transform='scale(1.1)'"
-        onmouseout="this.style.transform='scale(1)'"
-        >
-            <img src="${imagenSrc}" 
-              alt="Imagen del artículo" 
-              style="
-                width: 100%; 
-                height: 200px; 
-                border-radius: 8px; 
-                object-fit: cover; 
-                max-height: 200px;">
-            
-            <h3 style="margin: 10px 0 5px;">${articulo.descripcionadic}</h3>
-            <p style="color: #666; font-size: 0.9em;">${
-              articulo.descripcion
-            }</p>
-            <div style="margin-top: 10px;">
-                <span style="font-weight: bold;">Tallas disponibles:</span><br>
-                <span style="display: inline-block; margin-top: 5px; color: #444;">
-                    ${Array.from(articulo.tallas).join(", ")}
-                </span>
-            </div>
-        </div>
-    `;
+          <div class="card" style="
+              background: #fff;
+              border-radius: 12px;
+              box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+              padding: 5px;
+              text-align: center;
+              transition: transform 0.2s;
+              width: 250px;
+              overflow: hidden;
+          "
+          onmouseover="this.style.transform='scale(1.1)'"
+          onmouseout="this.style.transform='scale(1)'"
+          >
+              <img src="${imagenSrc}" 
+                alt="Imagen del artículo" 
+                style="
+                  width: 100%; 
+                  height: 200px; 
+                  border-radius: 8px; 
+                  object-fit: cover; 
+                  max-height: 200px;">
+              
+              <h3 style="margin: 10px 0 5px;">${articulo.descripcionadic}</h3>
+              <p style="color: #666; font-size: 0.9em;">${
+                articulo.descripcion
+              }</p>
+              
+              <div style="margin-top: 10px;">
+                  <span>Tallas disponibles:</span>
+                  <span style="display: inline-block; font-weight: bold; margin-top: 5px; color: #444;">
+                      ${Array.from(articulo.tallas).join(", ")}
+                  </span>
+              </div>
+
+              <div style="margin-top: 10px;">
+                <span>Precio:</span>
+                <p id="precio" style="font-weight: bold; color: #222;">
+                  ${
+                    articulo.pbruto != null
+                      ? articulo.pbruto.toFixed(2) + " €"
+                      : "Sin precio"
+                  }
+                </p>
+              </div>
+          </div>
+        `;
         });
         html += `</div>`;
         return html;
@@ -2297,6 +2210,12 @@ exportBtn.addEventListener("click", generarPDF);
             const tallas =
               card.querySelector("span:last-of-type")?.textContent.trim() || "";
 
+            const precioSpan = card.querySelector("#precio");
+            const precio = precioSpan?.textContent?.trim() || null;
+            const precioFormateado = precio
+              ? `${parseFloat(precio).toFixed(2)} €`
+              : "Sin precio";
+
             // Procesar imagen
             const imgSrc = imgEl?.src || "";
             // Comprueba si la foto está en data:image/jpeg;base64,/9j/4AAQSkZ...
@@ -2342,12 +2261,24 @@ exportBtn.addEventListener("click", generarPDF);
             });
             doc.setFontSize(7);
             doc.setFont("helvetica", "normal");
-            doc.text(desc, x + padding * 3, y + imgHeight + 12, {
+            doc.text(desc, x + padding * 3, y + imgHeight + 10, {
               maxWidth: cardWidth - padding * 6,
             });
-            doc.text("Tallas: " + tallas, x + padding * 3, y + imgHeight + 19, {
+            doc.text("Tallas: " + tallas, x + padding * 3, y + imgHeight + 16, {
               maxWidth: cardWidth - padding * 6,
             });
+            doc.text("Precio: ", x + padding * 3, y + imgHeight + 22, {
+              maxWidth: cardWidth - padding * 6,
+            });
+
+            doc.setFontSize(8);
+            doc.setFont("helvetica", "bold");
+            doc.text(precioFormateado, x + 10, y + imgHeight + 22, {
+              maxWidth: cardWidth - padding * 6,
+            });
+
+            doc.setFontSize(7);
+            doc.setFont("helvetica", "normal");
             /**
              ** Se avanza a la siguiente columna.
              ** Si ya se completó una fila (col >= cols), se reinicia la columna
@@ -2387,10 +2318,6 @@ exportBtn.addEventListener("click", generarPDF);
           console.error("Error al generar PDF:", error);
         }
       }
-
-
-
-
 
       // Utilidad: convierte imagen externa a base64
       async function toDataUrl(url) {
