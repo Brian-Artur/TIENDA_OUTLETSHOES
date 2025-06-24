@@ -20,22 +20,15 @@ def imagen_generica():
     return send_file(ruta, mimetype="image/jpg")
 
 
+# Conexión remota
 """ DB_CONFIG = {
     'server': 'SERVIDOR\\BREOGAN',
     'database': 'CENTRALBREOGAN',
     'username': 'sa',
     'password': 'masterkey',
     'driver': '{ODBC Driver 17 for SQL Server}'
-} """
+} 
 
-# Conectar a la base de datos local
-""" DB_CONFIG = {
-    'server': 'localhost',
-    'database': 'CENTRALBREOGAN',
-    'username': 'DESKTOP-LP5PVJ9\Victor',
-    'password': '1229',
-    'driver': '{ODBC Driver 17 for SQL Server}',
-}
 
 def get_connection():
     conn_str = (
@@ -47,6 +40,9 @@ def get_connection():
         
     )
     return pyodbc.connect(conn_str) """
+
+
+# Conexión local
 DB_CONFIG = {
     "server": "localhost",
     "database": "CENTRALBREOGAN",
