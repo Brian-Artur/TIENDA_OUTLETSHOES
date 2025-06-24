@@ -338,13 +338,8 @@
               class="benefits-button"
               style="background-color: #9f66ad"
             >
-              Catálogo</button
-            ><!-- Mi codigo -->
-            <!-- Mi codigo -->
-
-            <!--<button id="btn-beneficios" class="benefits-button" style="background-color: #444;">Informe por Proveedores</button>-->
-            <!--<button id="btn-beneficios-temporadas" class="benefits-button" style="background-color: #444;">Informe por Temporadas</button>-->
-            <!--<button id="btn-cierres-caja" class="benefits-button" style="background-color: #444;">Cierres de Caja</button>-->
+              Catálogo
+            </button>
           </div>
 
           <!-- Botones de exportación en una línea nueva -->
@@ -924,8 +919,6 @@
         }
       }
 
-      // Eventos
-      //fetchButton.addEventListener('click', fetchLambdaResult);
       reportButton.addEventListener("click", generateReport);
 
       document.addEventListener("DOMContentLoaded", () => {
@@ -1214,9 +1207,6 @@
           tableContainer.innerHTML = `<p class='error'>Error al obtener el infome de Cierres de Caja: ${error.message}</p>`;
         }
       }
-
-      //document.getElementById("btn-beneficios").addEventListener("click", fetchCuadroBeneficios);
-      //document.getElementById("btn-beneficios-temporadas").addEventListener("click", fetchCuadroBeneficiosTemporadas);
 
       function renderTableCuadroBeneficios(data) {
         if (!Array.isArray(data) || data.length === 0) {
@@ -2135,13 +2125,8 @@
         return html;
       }
 
-      // Se añade un listener al botón con id "btn-export-pdf"
       async function generarPDF() {
         try {
-          /**
-           *? Destructurar el objeto "window.jspdf". Pues jspdf.umd.min.js no deja
-           *? la clase jsPDF directamente en window, sino que deja un objeto llamado
-           *? window.jspdf */
           const { jsPDF } = window.jspdf;
           // Crea nuevo documento PDF en A4 vertical("p")
           const doc = new jsPDF("p", "mm", "a4");
@@ -2159,29 +2144,22 @@
           // Configurar dimensiones y layout
           const pageWidth = doc.internal.pageSize.getWidth(); // 210 mm
           const pageHeight = doc.internal.pageSize.getHeight(); // 297 mm
-          /**
-           *! Límites de la página */
-          const margin = 5;
-          const cols = 4; // columnas por fila
-          const rows = 4; // filas por página
 
-          /**
-           *^ Se calculan las dimensiones de cada tarjeta, teniendo en cuenta
-           *^ márgenes y espaciado interno entre tarjetas
-           */ // 5 = Margen entre columnas
+          const margin = 5;
+          const cols = 4;
+          const rows = 4;
+
           const cardWidth = (pageWidth - margin * 2 - (cols - 1) * 5) / cols;
           const cardHeight = (pageHeight - margin * 2 - (rows - 1) * 10) / rows;
-          // 10 = Margen entre filas
-          // Variables de posición y contador
+
           let x = margin; // 5mm
           let y = margin; // 5mm
           let col = 0;
           let row = 0;
           let padding = 0.5;
-          // Pie de página
+
           let count = 1;
 
-          // Fecha actual, formato de España
           const fecha = new Date().toLocaleDateString("es-ES");
 
           // Añadir encabezado SOLO en la primera página
@@ -2196,15 +2174,11 @@
           /**
            *^ Se recorre cada una de las tarjetas HTML seleccionadas antes. */
           for (let i = 0; i < cards.length; i++) {
-            // Una tarjeta en el orden del NodeList de tarjetas
             const card = cards[i];
-            // Subelementos de cada tarjeta
+
             const imgEl = card.querySelector("img");
             const h3 = card.querySelector("h3");
 
-            /**
-             *? Si h3 es null o undefined, no lanza un error, simplemente
-             *? devuelve undefined. */
             const cod = h3?.textContent.trim() || ""; // .trim() quita espacios
             const desc = card.querySelector("p")?.textContent.trim() || "";
             const tallas =

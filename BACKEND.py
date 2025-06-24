@@ -1218,45 +1218,6 @@ def get_foto_articulo():
         return jsonify({"error": "Imagen no encontrada"}), 404, cors_headers()
 
 
-# # Mi codigo
-# # Función para obtener imagen según temporada
-# def get_image_by_season(referencia):
-#     conn = get_connection()
-#     cursor = conn.cursor()
-#     query = """
-#         SELECT 
-#             A.CODARTICULO,
-#             A.DESCRIPCION,
-#             A.DESCRIPADIC,
-#             A.FOTO,
-#             S.TALLA,
-#             S.STOCK
-#         FROM dbo.ARTICULOS A
-#         JOIN dbo.STOCKS S ON A.CODARTICULO = S.CODARTICULO
-#         WHERE A.TEMPORADA = ? AND S.STOCK > 0
-#     """
-#     cursor.execute(query, (referencia,))
-#     rows = cursor.fetchall()
-
-#     # lista para guardar las imagenes transformadas
-#     imagenes = []
-#     if rows:
-#         for cod, desc, descadic, foto, talla, stock in rows:
-#             # Convertimos FOTO (bytes) a base64
-#             foto_b64 = base64.b64encode(foto).decode("utf-8") if foto else None
-#             imagenes.append(
-#                 {
-#                     "codarticulo": cod,
-#                     "descripcion": desc,
-#                     "descripcionadic": descadic,
-#                     "foto": foto_b64,
-#                     "talla": talla,
-#                     "stock": stock,
-#                 }
-#             )
-
-#         return imagenes
-
 
 def get_image_by_season(referencia):
     conn = get_connection()
@@ -1351,47 +1312,6 @@ def get_catalogo_proveedor():
     else:
         return jsonify({"error": "No se encontraron artículos"}), 404, cors_headers()
 
-
-# def get_images_by_supplier(proveedor):
-#     conn = get_connection()
-#     cursor = conn.cursor()
-
-#     query = """
-#         SELECT 
-#             A.CODARTICULO,
-#             A.DESCRIPCION,
-#             A.DESCRIPADIC,
-#             A.FOTO,
-#             S.TALLA,
-#             S.STOCK
-#         FROM dbo.ARTICULOS A
-#         JOIN dbo.STOCKS S ON A.CODARTICULO = S.CODARTICULO
-#         WHERE 
-#             S.STOCK > 0
-#             AND (
-#                 LEFT(A.DESCRIPADIC, 3) COLLATE Modern_Spanish_CI_AS = ?
-#                 OR LEFT(A.REFPROVEEDOR, 3) COLLATE Modern_Spanish_CI_AS = ?
-#             )
-#     """
-#     cursor.execute(query, (proveedor, proveedor))
-#     rows = cursor.fetchall()
-
-#     imagenes = []
-#     if rows:
-#         for cod, desc, descadic, foto, talla, stock in rows:
-#             foto_b64 = base64.b64encode(foto).decode("utf-8") if foto else None
-#             imagenes.append(
-#                 {
-#                     "codarticulo": cod,
-#                     "descripcion": desc,
-#                     "descripcionadic": descadic,
-#                     "foto": foto_b64,
-#                     "talla": talla,
-#                     "stock": stock,
-#                 }
-#             )
-
-#     return imagenes
 
 
 def get_images_by_supplier(proveedor):
