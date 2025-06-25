@@ -151,56 +151,78 @@
       }
 
       async function exportarTablaAPDF() {
+        // Declaración de la función y verificación inicial
         if (!window.jspdf || !window.jspdf.jsPDF) {
           alert("La librería jsPDF no está cargada correctamente.");
           return;
         }
+        // Iniciación del documento PDF
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF({
           orientation: "landscape",
           unit: "pt",
           format: "a4",
         });
-
+        //  Obtención de la tabla, dentro del contenedor
         const tabla = document.querySelector("#table-container table");
         if (!tabla) {
           alert("No hay tabla para exportar.");
           return;
         }
-
+        // Valores de fechas
         const fechaInicio =
           document.getElementById("fecha-ventas")?.value ||
           "Fecha inicio no seleccionada";
         const fechaFin =
           document.getElementById("fecha-final")?.value ||
           "Fecha final no seleccionada";
-
+        // Obtiene todas las filas de la tabla, y las convierte en un array
         const filas = Array.from(tabla.querySelectorAll("tr"));
+        // Filas del encabezado
         const headRows = [];
+        // Filas del cuerpo
         const bodyRows = [];
+        // flag para identificar cuándo estamos procesando el encabezado
         let inHeader = true;
 
+        // Por cada elemento de "filas"
         for (const fila of filas) {
+          // Genera un array
           const row = [];
+
+          // todos los elementos hijos directos (<td> o <th>) de la fila actual
           for (const cell of fila.children) {
+            /**
+             * Intenta obtener el atributo colspan de la celda
+             * Si no existe, usa "1" como valor por defecto
+             * parseInt convierte el valor a número (ej: "2" → 2) */
             const colspan = parseInt(cell.getAttribute("colspan") || "1");
+            // Obtiene el texto de la celda, eliminando espacios innecesarios
             const text = cell.innerText.trim();
+
+            /**
+             * Si colspan = 2 (celda que ocupa 2 columnas):
+             * - El bucle se ejecuta 2 veces
+             * - Primera iteración (i=0): añade el texto
+             * - Segunda iteración (i=1): añade cadena vacía ("") */
             for (let i = 0; i < colspan; i++) {
-              row.push(i === 0 ? text : "");
+              row.push(i === 0 ? text : "");        // ["Producto 1", "", "25.99"]
             }
           }
 
+          // Si es encabezado (contiene th) y aún no hemos salido del encabezado: va a headRows
           if (inHeader && fila.querySelectorAll("th").length > 0) {
             headRows.push(row);
           } else {
+            // Cualquier otra fila: va a bodyRows y marca que hemos salido del encabezado
             inHeader = false;
             bodyRows.push(row);
           }
         }
 
         // Dibujar encabezado solo en la primera hoja
-        const marginLeft = 40;
-        const headerStartY = 40;
+        const marginLeft = 40;    // margen izquierdo (40pt)
+        const headerStartY = 40;  // posición vertical inicial (40pt desde arriba)
 
         doc.setFont("helvetica", "bold");
         doc.setFontSize(14);
@@ -240,6 +262,8 @@
 
         doc.save("cuadro-beneficios.pdf");
       }
+
+      
     </script>
   </head>
   <body>
