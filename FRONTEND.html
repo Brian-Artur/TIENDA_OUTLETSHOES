@@ -150,120 +150,121 @@
         link.click();
       }
 
-      async function exportarTablaAPDF() {
-        // Declaración de la función y verificación inicial
-        if (!window.jspdf || !window.jspdf.jsPDF) {
-          alert("La librería jsPDF no está cargada correctamente.");
-          return;
+
+async function exportarTablaAPDF() {
+    const contenedor = document.getElementById("table-container");
+
+    // Espera a que las imágenes se carguen
+    await esperarImagenesCargadas(contenedor);
+    console.log("Todas las imágenes cargadas");
+
+    html2canvas(contenedor, {
+        scale: 2,
+        useCORS: true
+    }).then(canvas => {
+        const imgData = canvas.toDataURL("image/jpeg", 1.0);
+
+        if (!imgData.startsWith("data:image")) {
+            alert("No se pudo generar la imagen del catálogo.");
+            return;
         }
-        // Iniciación del documento PDF
+
         const { jsPDF } = window.jspdf;
-        const doc = new jsPDF({
-          orientation: "landscape",
-          unit: "pt",
-          format: "a4",
-        });
-        //  Obtención de la tabla, dentro del contenedor
-        const tabla = document.querySelector("#table-container table");
-        if (!tabla) {
-          alert("No hay tabla para exportar.");
-          return;
-        }
-        // Valores de fechas
-        const fechaInicio =
-          document.getElementById("fecha-ventas")?.value ||
-          "Fecha inicio no seleccionada";
-        const fechaFin =
-          document.getElementById("fecha-final")?.value ||
-          "Fecha final no seleccionada";
-        // Obtiene todas las filas de la tabla, y las convierte en un array
-        const filas = Array.from(tabla.querySelectorAll("tr"));
-        // Filas del encabezado
-        const headRows = [];
-        // Filas del cuerpo
-        const bodyRows = [];
-        // flag para identificar cuándo estamos procesando el encabezado
-        let inHeader = true;
+        const pdf = new jsPDF("p", "mm", "a4");
 
-        // Por cada elemento de "filas"
-        for (const fila of filas) {
-          // Genera un array
-          const row = [];
+        const pageWidth = pdf.internal.pageSize.getWidth() - 20; // márgenes laterales
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        
+        const imgProps = pdf.getImageProperties(imgData);
+        const canvasHeight = canvas.height;
+        const canvasWidth = canvas.width;
 
-          // todos los elementos hijos directos (<td> o <th>) de la fila actual
-          for (const cell of fila.children) {
-            /**
-             * Intenta obtener el atributo colspan de la celda
-             * Si no existe, usa "1" como valor por defecto
-             * parseInt convierte el valor a número (ej: "2" → 2) */
-            const colspan = parseInt(cell.getAttribute("colspan") || "1");
-            // Obtiene el texto de la celda, eliminando espacios innecesarios
-            const text = cell.innerText.trim();
+        // Configuración de cortes
+        const config = {
+            marginTop: 10, // mm desde la parte superior de la página
+            marginBottom: 10, // mm desde la parte inferior
+            contentOverlap: 30, // px de solapamiento entre páginas
+            repeatContentHeight: 60, // px de contenido que se repite
+            initialOffset: 0 // px desde donde empezar a cortar
+        };
 
-            /**
-             * Si colspan = 2 (celda que ocupa 2 columnas):
-             * - El bucle se ejecuta 2 veces
-             * - Primera iteración (i=0): añade el texto
-             * - Segunda iteración (i=1): añade cadena vacía ("") */
-            for (let i = 0; i < colspan; i++) {
-              row.push(i === 0 ? text : "");        // ["Producto 1", "", "25.99"]
+        // Convertir márgenes de mm a píxeles
+        const marginTopPx = (config.marginTop * canvasWidth) / pageWidth;
+        const marginBottomPx = (config.marginBottom * canvasWidth) / pageWidth;
+        
+        // Altura máxima por página en píxeles
+        const maxPageHeightPx = ((pageHeight - config.marginTop - config.marginBottom) * canvasWidth) / pageWidth;
+
+        let currentPosition = config.initialOffset;
+        let isFirstPage = true;
+
+        while (currentPosition < canvasHeight) {
+            // Calcular altura para esta página
+            let pageHeightPx = Math.min(
+                maxPageHeightPx, 
+                canvasHeight - currentPosition + (isFirstPage ? 0 : config.repeatContentHeight)
+            );
+
+            // Asegurarnos de no capturar más allá del canvas
+            const captureHeight = Math.min(
+                pageHeightPx + (isFirstPage ? 0 : config.repeatContentHeight),
+                canvasHeight - (currentPosition - (isFirstPage ? 0 : config.repeatContentHeight))
+            );
+
+            // Crear canvas para la página actual
+            const pageCanvas = document.createElement("canvas");
+            pageCanvas.width = canvasWidth;
+            pageCanvas.height = pageHeightPx;
+
+            const ctx = pageCanvas.getContext("2d");
+            
+            // Dibujar el contenido de la página actual
+            ctx.fillStyle = "white"; // Fondo blanco para evitar áreas negras
+            ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+            
+            ctx.drawImage(
+                canvas,
+                0, Math.max(0, currentPosition - (isFirstPage ? 0 : config.repeatContentHeight)), // origen (y)
+                canvasWidth, captureHeight, // altura a capturar
+                0, 0, // destino (x,y)
+                canvasWidth, pageHeightPx // dimensiones destino
+            );
+
+            const pageImgData = pageCanvas.toDataURL("image/jpeg", 1.0);
+
+            if (!isFirstPage) {
+                pdf.addPage();
+            } else {
+                isFirstPage = false;
             }
-          }
 
-          // Si es encabezado (contiene th) y aún no hemos salido del encabezado: va a headRows
-          if (inHeader && fila.querySelectorAll("th").length > 0) {
-            headRows.push(row);
-          } else {
-            // Cualquier otra fila: va a bodyRows y marca que hemos salido del encabezado
-            inHeader = false;
-            bodyRows.push(row);
-          }
+            // Añadir imagen al PDF
+            const pdfImgHeight = (pageHeightPx * pageWidth) / canvasWidth;
+            pdf.addImage(
+                pageImgData, 
+                "JPEG", 
+                10, // x (margin left)
+                config.marginTop, // y (margin top)
+                pageWidth, 
+                pdfImgHeight
+            );
+
+            // Mover la posición para la siguiente página
+            currentPosition += pageHeightPx - config.contentOverlap;
+            
+            // Si hay contenido que repetir, retrocedemos la posición
+            if (config.repeatContentHeight > 0 && currentPosition < canvasHeight) {
+                currentPosition -= config.repeatContentHeight;
+            }
         }
 
-        // Dibujar encabezado solo en la primera hoja
-        const marginLeft = 40;    // margen izquierdo (40pt)
-        const headerStartY = 40;  // posición vertical inicial (40pt desde arriba)
+        pdf.save("catalogo.pdf");
+    }).catch(err => {
+        console.error("Error generando el PDF:", err);
+    });
+};
 
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(14);
-        doc.setTextColor(40);
-        doc.text(
-          "CUADRO DE BENEFICIOS POR PROVEEDOR - CALZADOS BREOGÁN, S.L.",
-          marginLeft,
-          headerStartY
-        );
 
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(10);
-        doc.text(
-          `Fechas seleccionadas: ${fechaInicio} a ${fechaFin}`,
-          marginLeft,
-          headerStartY + 20
-        );
-
-        // Dibujar tabla dejando espacio para el encabezado solo en la primera página
-        doc.autoTable({
-          head: headRows,
-          body: bodyRows,
-          startY: headerStartY + 40,
-          margin: { left: marginLeft, right: marginLeft },
-          theme: "grid",
-          styles: {
-            fontSize: 6,
-            cellPadding: 2,
-            overflow: "linebreak",
-          },
-          headStyles: {
-            fillColor: [230, 230, 230],
-            textColor: 20,
-            fontSize: 7,
-          },
-        });
-
-        doc.save("cuadro-beneficios.pdf");
-      }
-
-      
     </script>
   </head>
   <body>
@@ -980,6 +981,11 @@
 
             if (jsonData.data && Array.isArray(jsonData.data)) {
               renderTable(jsonData.data);
+
+              const exportBtn = document.getElementById("btn-export-pdf");
+              if (exportBtn) exportBtn.remove();
+
+              generarBotonesAcciones();
               cargarResumenFormasPago();
             } else {
               tableContainer.innerHTML =
