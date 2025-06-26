@@ -2021,56 +2021,63 @@ async function exportarTablaAPDF() {
 
         // Función reutilizable para pedir dato y llamar al backend
         const handleSearch = async (tipo) => {
-          const etiqueta = tipo === "T" ? "temporada" : "proveedor";
-          const campo = prompt(
-            `Introduce el código de ${etiqueta}:`
-          )?.toUpperCase();
+    const etiqueta = tipo === "T" ? "temporada" : "proveedor";
+    const campo = prompt(
+        `Introduce el código de ${etiqueta}:`
+    )?.toUpperCase();
 
-          if (!campo || campo.trim() === "") {
-            tableContainer.innerHTML = `<p class="error">Consulta cancelada. No se proporcionó ${etiqueta}.</p>`;
-            document.body.removeChild(modal);
-            return;
-          }
+    if (!campo || campo.trim() === "") {
+        tableContainer.innerHTML = `<p class="error">Consulta cancelada. No se proporcionó ${etiqueta}.</p>`;
+        document.body.removeChild(modal);
+        return;
+    }
 
-          tableContainer.innerHTML = "Cargando imágenes del catálogo...";
+    tableContainer.innerHTML = "Cargando imágenes del catálogo...";
 
-          const url =
-            tipo === "T"
-              ? `http://localhost:5000/catalogo-temporada?referencia=${campo}`
-              : `http://localhost:5000/catalogo-proveedor?proveedor=${campo}`;
+    const url = tipo === "T"
+        ? `http://localhost:5000/catalogo-temporada?referencia=${campo}`
+        : `http://localhost:5000/catalogo-proveedor?proveedor=${campo}`;
 
-          try {
-            const res = await fetch(url);
-            if (!res.ok) throw new Error("Error al obtener las imágenes");
+    try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("Error al obtener las imágenes");
 
-            const result = await res.json();
+        const result = await res.json();
 
-            tableContainer.innerHTML = `
-        <h2 id="title-catalogo">Catálogo por ${etiqueta}: ${campo}</h2>
-        ${renderCatalogo(result.data)}
-      `;
+        // Renderizar el catálogo
+        tableContainer.innerHTML = `
+            <h2 id="title-catalogo">Catálogo por ${etiqueta}: ${campo}</h2>
+            ${renderCatalogo(result.data)}
+        `;
 
-      const filtros = document.querySelector("#filtros-temporada");
-      if (filtros) filtros.innerHTML = "";
+        // Solo añadir filtro si es búsqueda por proveedor
+        if (tipo === "P") {
+            // Extraer temporadas únicas de los datos
+            const temporadas = [...new Set(result.data.map(item => item.temporada))].filter(Boolean);
+            
+            if (temporadas.length > 1) { // Solo mostrar filtro si hay más de una temporada
+                const filtroContainer = generarFiltroTemporadas(temporadas);
+                tableContainer.insertBefore(filtroContainer, tableContainer.querySelector("#galeria"));
+            }
+        }
 
-            // MOVER ESTE BLOQUE AQUÍ, DESPUÉS DE RENDERIZAR
-            const grBtnBot = document.getElementById("gr-btns-bot");
-            const existingBtn = document.getElementById("btn-export-pdf");
-            if (existingBtn) existingBtn.remove();
+        // Botón de exportación
+        const grBtnBot = document.getElementById("gr-btns-bot");
+        const existingBtn = document.getElementById("btn-export-pdf");
+        if (existingBtn) existingBtn.remove();
 
-            const exportBtn = document.createElement("button");
-            exportBtn.id = "btn-export-pdf";
-            exportBtn.textContent = "Exportar catálogo";
+        const exportBtn = document.createElement("button");
+        exportBtn.id = "btn-export-pdf";
+        exportBtn.textContent = "Exportar catálogo";
+        grBtnBot.appendChild(exportBtn);
+        exportBtn.addEventListener("click", generarPDF);
 
-            grBtnBot.appendChild(exportBtn);
-
-            exportBtn.addEventListener("click", generarPDF);
-          } catch (err) {
-            tableContainer.innerHTML = `<p class="error">Error: ${err.message}</p>`;
-          } finally {
-            document.body.removeChild(modal); // cerrar modal al final
-          }
-        };
+    } catch (err) {
+        tableContainer.innerHTML = `<p class="error">Error: ${err.message}</p>`;
+    } finally {
+        document.body.removeChild(modal);
+    }
+};
 
         // Escuchar clic en los botones
         modalBox
@@ -2081,191 +2088,470 @@ async function exportarTablaAPDF() {
           .addEventListener("click", () => handleSearch("P"));
       });
 
-      //función para renderizar catálogo
-      function renderCatalogo(data) {
-        if (!Array.isArray(data) || data.length === 0)
-          return "<p>Sin datos</p>";
 
-        //imagen para artículos sin foto
-        //const imagenGenerica = "./img/foto.jpg";
-        const imagenGenerica = "http://localhost:5000/imagen-generica";
-
-        // Agrupar artículos por codarticulo
-        const articulosMap = new Map();
-
-        data.forEach((item) => {
-          const cod = item.codarticulo;
-
-          if (!articulosMap.has(cod)) {
-            articulosMap.set(cod, {
-              descripcion: item.descripcion,
-              descripcionadic: item.descripcionadic,
-              foto: item.foto,
-              pbruto: item.pbruto,
-              tallas: new Set(),
-            });
-          }
-
-          articulosMap.get(cod).tallas.add(item.talla);
-        });
-
-        // Render catálogo como tabla visual
-        let html = `
-            <div id="galeria" style="
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-                gap: 20px;
-                padding: 20px;
+      // Función para generar el HTML del filtro de temporadas
+    function generarFiltroTemporadas(temporadas) {
+    const contenedor = document.createElement('div');
+    contenedor.id = 'filtro-temporada-proveedor';
+    contenedor.style.margin = '20px 0';
+    contenedor.style.padding = '0 20px'; // Alinear con el contenido
+    
+    let html = `<div style="
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        ">
+        <strong style="display: block; margin-bottom: 10px;">Filtrar por temporada:</strong>
+        <div style="display: flex; flex-wrap: wrap; gap: 10px;">`;
+    
+    temporadas.forEach(temp => {
+        if (!temp) return; // Saltar temporadas vacías
+        const id = `temp_${temp.replace(/\s+/g, '_')}`;
+        html += `
+            <label style="
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                background: #fff;
+                padding: 5px 10px;
+                border-radius: 15px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                cursor: pointer;
             ">
-            `;
+                <input type="checkbox" value="${temp}" checked 
+                       onchange="filtrarCatalogoPorTemporada()">
+                ${temp}
+            </label>
+        `;
+    });
+    
+    html += `</div></div>`;
+    contenedor.innerHTML = html;
+    return contenedor;
+}
 
-        articulosMap.forEach((articulo, cod) => {
-          //Aquí usamos imagen base64 si hay, si no, usamos la imagen genérica
-          const imagenSrc = articulo.foto
+
+      // Función para filtrar el catálogo por temporada
+     function filtrarCatalogoPorTemporada() {
+    const checkboxes = document.querySelectorAll(
+        '#filtro-temporada-proveedor input[type="checkbox"]'
+    );
+    const seleccionadas = Array.from(checkboxes)
+        .filter(chk => chk.checked)
+        .map(chk => chk.value.trim().toUpperCase());
+
+    const galeria = document.getElementById("galeria");
+    if (!galeria) return;
+
+    const cards = galeria.querySelectorAll(".card");
+    let anyHidden = false;
+    
+    cards.forEach(card => {
+        const temporada = card.dataset.temporada || "";
+        const debeMostrar = seleccionadas.length === 0 || seleccionadas.includes(temporada);
+        
+        if (!debeMostrar) {
+            card.style.display = "none";
+            anyHidden = true;
+        } else {
+            card.style.display = ""; // Restablecer display
+        }
+    });
+
+    // Ajustar el grid cuando hay elementos ocultos
+    if (anyHidden) {
+        galeria.style.gridAutoRows = "1fr"; // Forzar filas de igual altura
+    } else {
+        galeria.style.gridAutoRows = ""; // Volver al comportamiento normal
+    }
+}
+
+
+function renderCatalogo(data) {
+    if (!Array.isArray(data) || data.length === 0)
+        return "<p>Sin datos</p>";
+
+    const imagenGenerica = "http://localhost:5000/imagen-generica";
+    const articulosMap = new Map();
+
+    // Procesar datos para agrupar por artículo y contar tallas
+    data.forEach((item) => {
+        const cod = item.codarticulo;
+        if (!articulosMap.has(cod)) {
+            articulosMap.set(cod, {
+                descripcion: item.descripcion,
+                referencia: item.referencia,
+                foto: item.foto,
+                pbruto: item.pbruto,
+                temporada: item.temporada || "",
+                tallas: {}, // Cambiamos Set por objeto para guardar talla: cantidad
+            });
+        }
+        
+        // Acumular stock por talla
+        if (item.talla) {
+            if (!articulosMap.get(cod).tallas[item.talla]) {
+                articulosMap.get(cod).tallas[item.talla] = 0;
+            }
+            articulosMap.get(cod).tallas[item.talla] += item.stock || 0;
+        }
+    });
+
+    // Render catálogo
+    let html = `
+        <div id="galeria" style="
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            padding: 10px;
+            align-items: start;
+        ">
+    `;
+
+    articulosMap.forEach((articulo, cod) => {
+        const imagenSrc = articulo.foto
             ? `data:image/jpeg;base64,${articulo.foto}`
             : imagenGenerica;
 
-          html += `
-          <div class="card" style="
-              background: #fff;
-              border-radius: 12px;
-              box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-              padding: 5px;
-              text-align: center;
-              transition: transform 0.2s;
-              width: 250px;
-              overflow: hidden;
-          "
-          onmouseover="this.style.transform='scale(1.1)'"
-          onmouseout="this.style.transform='scale(1)'"
-          >
-              <img src="${imagenSrc}" 
+        // Generar lista de tallas con stock
+        let tallasHtml = '';
+        Object.entries(articulo.tallas).forEach(([talla, cantidad]) => {
+            tallasHtml += `
+                <span style="
+                    display: inline-block;
+                    margin: 2px;
+                    padding: 3px 6px;
+                    background: ${cantidad > 0 ? '#e8f5e9' : '#ffebee'};
+                    border-radius: 3px;
+                    font-size: 0.85em;
+                ">
+                    ${talla} (${cantidad})
+                </span>
+            `;
+        });
+
+        html += `
+        <div class="card" data-temporada="${articulo.temporada.toUpperCase()}" style="
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            padding: 8px;
+            text-align: center;
+            transition: transform 0.2s;
+            width: 100%;
+            overflow: hidden;
+            height: 100%;
+            box-sizing: border-box;
+        ">
+            <img src="${imagenSrc}" 
                 alt="Imagen del artículo" 
                 style="
-                  width: 100%; 
-                  height: 200px; 
-                  border-radius: 8px; 
-                  object-fit: cover; 
-                  max-height: 200px;">
-              
-              <h3 style="margin: 10px 0 5px;">${articulo.descripcionadic}</h3>
-              <p style="color: #666; font-size: 0.9em;">${
-                articulo.descripcion
-              }</p>
-              
-              <div style="margin-top: 10px;">
-                  <span>Tallas disponibles:</span>
-                  <span style="display: inline-block; font-weight: bold; margin-top: 5px; color: #444;">
-                      ${Array.from(articulo.tallas).join(", ")}
-                  </span>
-              </div>
+                    width: 100%; 
+                    height: 180px; 
+                    border-radius: 6px; 
+                    object-fit: cover;
+                    margin-bottom: 8px;">
+            
+            <h3 style="margin: 5px 0; font-size: 1em; line-height: 1.2;">${articulo.referencia}</h3>
+            <p style="color: #666; font-size: 0.85em; margin-bottom: 8px; line-height: 1.3;">
+                ${articulo.descripcion}
+            </p>
+            
+            <div style="margin: 8px 0;">
+                <div style="
+                    font-size: 0.85em;
+                    color: #555;
+                    margin-bottom: 4px;
+                ">Tallas disponibles:</div>
+                <div class="talla" 
+                  style="
+                    display: flex;
+                    flex-wrap: wrap;
+                    justify-content: center;
+                    gap: 3px;
+                ">
+                    ${tallasHtml}
+                </div>
+            </div>
 
-              <div style="margin-top: 10px;">
-                <span>Precio:</span>
-                <p id="precio" style="font-weight: bold; color: #222;">
-                  ${
-                    articulo.pbruto != null
-                      ? articulo.pbruto.toFixed(2) + " €"
-                      : "Sin precio"
-                  }
+            <div style="margin-top: auto; padding-top: 5px;">
+                <span style="font-size: 0.9em;">Precio:</span>
+                <p id="precio"
+                  style="
+                    font-weight: bold; 
+                    color: #222; 
+                    margin: 3px 0 0;
+                    font-size: 1em;
+                ">
+                    ${articulo.pbruto != null ? articulo.pbruto.toFixed(2) + " €" : "Sin precio"}
                 </p>
-              </div>
-          </div>
+            </div>
+        </div>
         `;
-        });
-        html += `</div>`;
-        return html;
-      }
+    });
+    html += `</div>`;
+    return html;
+}
 
+
+      // async function generarPDF() {
+      //   try {
+      //     const { jsPDF } = window.jspdf;
+      //     // Crea nuevo documento PDF en A4 vertical("p")
+      //     const doc = new jsPDF("p", "mm", "a4");
+      //     // Obtener el contenedor #galeria
+      //     const catalogoElement = document.getElementById("galeria");
+      //     if (!catalogoElement) {
+      //       alert("No hay catálogo cargado.");
+      //       return;
+      //     }
+
+      //     // Obtener todas las tarjetas y las guarda en un NodeList == Array
+      //     const cards = catalogoElement.querySelectorAll(".card");
+      //     const title = document.getElementById("title-catalogo");
+
+      //     // Configurar dimensiones y layout
+      //     const pageWidth = doc.internal.pageSize.getWidth(); // 210 mm
+      //     const pageHeight = doc.internal.pageSize.getHeight(); // 297 mm
+
+      //     const margin = 5;
+      //     const cols = 4;
+      //     const rows = 4;
+
+      //     const cardWidth = (pageWidth - margin * 2 - (cols - 1) * 5) / cols;
+      //     const cardHeight = (pageHeight - margin * 2 - (rows - 1) * 10) / rows;
+
+      //     let x = margin; // 5mm
+      //     let y = margin; // 5mm
+      //     let col = 0;
+      //     let row = 0;
+      //     let padding = 0.5;
+
+      //     let count = 1;
+
+      //     const fecha = new Date().toLocaleDateString("es-ES");
+
+      //     // Añadir encabezado SOLO en la primera página
+      //     doc.setFontSize(16);
+      //     doc.text(title.innerText, margin, 12);
+      //     doc.setFontSize(10);
+      //     doc.text(`Fecha: ${fecha}`, margin, 18);
+
+      //     // Ajustar margen superior de la primera página
+      //     y = 20;
+
+      //     /**
+      //      *^ Se recorre cada una de las tarjetas HTML seleccionadas antes. */
+      //     for (let i = 0; i < cards.length; i++) {
+      //       const card = cards[i];
+
+      //       const imgEl = card.querySelector("img");
+      //       const h3 = card.querySelector("h3");
+
+      //       const cod = h3?.textContent.trim() || ""; // .trim() quita espacios
+      //       const desc = card.querySelector("p")?.textContent.trim() || "";
+      //       const tallas =
+      //         card.querySelector("span:last-of-type")?.textContent.trim() || "";
+
+      //       const precioSpan = card.querySelector("#precio");
+      //       const precio = precioSpan?.textContent?.trim() || null;
+      //       const precioFormateado = precio
+      //         ? `${parseFloat(precio).toFixed(2)} €`
+      //         : "Sin precio";
+
+      //       // Procesar imagen
+      //       const imgSrc = imgEl?.src || "";
+      //       // Comprueba si la foto está en data:image/jpeg;base64,/9j/4AAQSkZ...
+      //       const isBase64 = imgSrc.startsWith("data:image");
+      //       const finalImage = isBase64
+      //         ? imgSrc
+      //         : "http://localhost:5000/imagen-generica";
+
+      //       let base64Image = finalImage;
+      //       if (!isBase64) {
+      //         base64Image = await toDataUrl(finalImage);
+      //       }
+
+      //       /**
+      //        *? Se inserta la imagen en la posición actual (x, y) ocupando
+      //        *? la mitad superior del espacio del card. */
+      //       const imgHeight = cardHeight * 0.6;
+      //       doc.addImage(
+      //         base64Image,
+      //         "JPEG",
+      //         x + padding,
+      //         y + padding,
+      //         cardWidth - padding * 2,
+      //         imgHeight - padding
+      //       );
+
+      //       // Borde con esquinas redondeadas
+      //       doc.setDrawColor(255, 255, 255);
+      //       doc.setLineWidth(1.5);
+      //       doc.roundedRect(x, y, cardWidth, cardHeight, 2.5, 2.5, "S");
+
+      //       doc.setDrawColor(237, 232, 228);
+      //       doc.setLineWidth(0.5);
+      //       doc.roundedRect(x, y, cardWidth, cardHeight, 2.5, 2.5, "S");
+
+      //       /**
+      //        *~ Se añaden tres líneas de texto debajo de la imagen
+      //        *~ con espaciado vertical entre ellas. */
+      //       doc.setFontSize(12);
+      //       doc.setFont("helvetica", "bold");
+      //       doc.text(cod, x + padding * 3, y + imgHeight + 5, {
+      //         maxWidth: cardWidth - padding * 6,
+      //       });
+      //       doc.setFontSize(7);
+      //       doc.setFont("helvetica", "normal");
+      //       doc.text(desc, x + padding * 3, y + imgHeight + 10, {
+      //         maxWidth: cardWidth - padding * 6,
+      //       });
+      //       doc.text("Tallas: " + tallas, x + padding * 3, y + imgHeight + 16, {
+      //         maxWidth: cardWidth - padding * 6,
+      //       });
+      //       doc.text("Precio: ", x + padding * 3, y + imgHeight + 22, {
+      //         maxWidth: cardWidth - padding * 6,
+      //       });
+
+      //       doc.setFontSize(8);
+      //       doc.setFont("helvetica", "bold");
+      //       doc.text(precioFormateado, x + 10, y + imgHeight + 22, {
+      //         maxWidth: cardWidth - padding * 6,
+      //       });
+
+      //       doc.setFontSize(7);
+      //       doc.setFont("helvetica", "normal");
+      //       /**
+      //        ** Se avanza a la siguiente columna.
+      //        ** Si ya se completó una fila (col >= cols), se reinicia la columna
+      //        ** y se baja una fila (row++). */
+      //       col++;
+      //       if (col >= cols) {
+      //         col = 0;
+      //         row++;
+      //         x = margin;
+      //         y += cardHeight + 3;
+      //       } else {
+      //         x += cardWidth + 5;
+      //       }
+      //       /**
+      //        *^ Si ya se colocaron todas las filas posibles (16 tarjetas) y aún
+      //        *^ hay más tarjetas, se añade una nueva página. La posición se
+      //        *^ reinicia arriba (y = margin) porque solo la primera página tiene
+      //        *^ encabezado. */
+      //       if (row >= rows && i < cards.length - 1) {
+      //         doc.text(
+      //           "Página " + count,
+      //           pageWidth - margin * 3,
+      //           pageHeight - margin * 1.2,
+      //           { maxWidth: cardWidth - padding * 6 }
+      //         );
+      //         doc.addPage();
+      //         row = 0;
+      //         col = 0;
+      //         x = margin;
+      //         y = margin;
+      //         count++;
+      //       }
+      //     }
+
+      //     doc.save("catalogo_productos.pdf");
+      //   } catch (error) {
+      //     console.error("Error al generar PDF:", error);
+      //   }
+      // }
+
+      // Utilidad: convierte imagen externa a base64
+      
       async function generarPDF() {
-        try {
-          const { jsPDF } = window.jspdf;
-          // Crea nuevo documento PDF en A4 vertical("p")
-          const doc = new jsPDF("p", "mm", "a4");
-          // Obtener el contenedor #galeria
-          const catalogoElement = document.getElementById("galeria");
-          if (!catalogoElement) {
+    try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF("p", "mm", "a4");
+        const catalogoElement = document.getElementById("galeria");
+        
+        if (!catalogoElement) {
             alert("No hay catálogo cargado.");
             return;
-          }
+        }
 
-          // Obtener todas las tarjetas y las guarda en un NodeList == Array
-          const cards = catalogoElement.querySelectorAll(".card");
-          const title = document.getElementById("title-catalogo");
+        const cards = catalogoElement.querySelectorAll(".card");
+        const title = document.getElementById("title-catalogo");
 
-          // Configurar dimensiones y layout
-          const pageWidth = doc.internal.pageSize.getWidth(); // 210 mm
-          const pageHeight = doc.internal.pageSize.getHeight(); // 297 mm
+        // Configurar dimensiones y layout
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
 
-          const margin = 5;
-          const cols = 4;
-          const rows = 4;
+        const margin = 5;
+        const cols = 4;
+        const rows = 4;
 
-          const cardWidth = (pageWidth - margin * 2 - (cols - 1) * 5) / cols;
-          const cardHeight = (pageHeight - margin * 2 - (rows - 1) * 10) / rows;
+        const cardWidth = (pageWidth - margin * 2 - (cols - 1) * 5) / cols;
+        const cardHeight = (pageHeight - margin * 2 - (rows - 1) * 10) / rows;
 
-          let x = margin; // 5mm
-          let y = margin; // 5mm
-          let col = 0;
-          let row = 0;
-          let padding = 0.5;
+        let x = margin;
+        let y = margin;
+        let col = 0;
+        let row = 0;
+        let padding = 0.5;
+        let count = 1;
 
-          let count = 1;
+        const fecha = new Date().toLocaleDateString("es-ES");
 
-          const fecha = new Date().toLocaleDateString("es-ES");
+        // Añadir encabezado
+        doc.setFontSize(16);
+        doc.text(title.innerText, margin, 12);
+        doc.setFontSize(10);
+        doc.text(`Fecha: ${fecha}`, margin, 18);
+        y = 20;
 
-          // Añadir encabezado SOLO en la primera página
-          doc.setFontSize(16);
-          doc.text(title.innerText, margin, 12);
-          doc.setFontSize(10);
-          doc.text(`Fecha: ${fecha}`, margin, 18);
-
-          // Ajustar margen superior de la primera página
-          y = 20;
-
-          /**
-           *^ Se recorre cada una de las tarjetas HTML seleccionadas antes. */
-          for (let i = 0; i < cards.length; i++) {
+        for (let i = 0; i < cards.length; i++) {
             const card = cards[i];
 
             const imgEl = card.querySelector("img");
             const h3 = card.querySelector("h3");
+            const tallasContainer = card.querySelector(".talla");
 
-            const cod = h3?.textContent.trim() || ""; // .trim() quita espacios
+            const cod = h3?.textContent.trim() || "";
             const desc = card.querySelector("p")?.textContent.trim() || "";
-            const tallas =
-              card.querySelector("span:last-of-type")?.textContent.trim() || "";
+            
+            // Obtener todas las tallas con sus cantidades
+            let tallasText = "";
+            if (tallasContainer) {
+                const tallasElements = tallasContainer.querySelectorAll("span");
+                tallasText = Array.from(tallasElements)
+                    .map(el => el.textContent.trim())
+                    .join(", ");
+            }
 
             const precioSpan = card.querySelector("#precio");
             const precio = precioSpan?.textContent?.trim() || null;
             const precioFormateado = precio
-              ? `${parseFloat(precio).toFixed(2)} €`
-              : "Sin precio";
+                ? `${parseFloat(precio).toFixed(2)} €`
+                : "Sin precio";
 
             // Procesar imagen
             const imgSrc = imgEl?.src || "";
-            // Comprueba si la foto está en data:image/jpeg;base64,/9j/4AAQSkZ...
             const isBase64 = imgSrc.startsWith("data:image");
             const finalImage = isBase64
-              ? imgSrc
-              : "http://localhost:5000/imagen-generica";
+                ? imgSrc
+                : "http://localhost:5000/imagen-generica";
 
             let base64Image = finalImage;
             if (!isBase64) {
-              base64Image = await toDataUrl(finalImage);
+                base64Image = await toDataUrl(finalImage);
             }
 
-            /**
-             *? Se inserta la imagen en la posición actual (x, y) ocupando
-             *? la mitad superior del espacio del card. */
+            // Insertar imagen
             const imgHeight = cardHeight * 0.6;
             doc.addImage(
-              base64Image,
-              "JPEG",
-              x + padding,
-              y + padding,
-              cardWidth - padding * 2,
-              imgHeight - padding
+                base64Image,
+                "JPEG",
+                x + padding,
+                y + padding,
+                cardWidth - padding * 2,
+                imgHeight - padding
             );
 
             // Borde con esquinas redondeadas
@@ -2277,75 +2563,79 @@ async function exportarTablaAPDF() {
             doc.setLineWidth(0.5);
             doc.roundedRect(x, y, cardWidth, cardHeight, 2.5, 2.5, "S");
 
-            /**
-             *~ Se añaden tres líneas de texto debajo de la imagen
-             *~ con espaciado vertical entre ellas. */
+            // Texto debajo de la imagen
             doc.setFontSize(12);
             doc.setFont("helvetica", "bold");
             doc.text(cod, x + padding * 3, y + imgHeight + 5, {
-              maxWidth: cardWidth - padding * 6,
+                maxWidth: cardWidth - padding * 6,
             });
+            
             doc.setFontSize(7);
             doc.setFont("helvetica", "normal");
             doc.text(desc, x + padding * 3, y + imgHeight + 10, {
-              maxWidth: cardWidth - padding * 6,
+                maxWidth: cardWidth - padding * 6,
             });
-            doc.text("Tallas: " + tallas, x + padding * 3, y + imgHeight + 16, {
-              maxWidth: cardWidth - padding * 6,
+            
+            // Mostrar todas las tallas (puede ocupar varias líneas)
+            const tallasLines = doc.splitTextToSize("Tallas: " + tallasText, cardWidth - padding * 6);
+            doc.text(tallasLines, x + padding * 3, y + imgHeight + 16, {
+                maxWidth: cardWidth - padding * 6,
             });
+            
             doc.text("Precio: ", x + padding * 3, y + imgHeight + 22, {
-              maxWidth: cardWidth - padding * 6,
+                maxWidth: cardWidth - padding * 6,
             });
 
             doc.setFontSize(8);
             doc.setFont("helvetica", "bold");
             doc.text(precioFormateado, x + 10, y + imgHeight + 22, {
-              maxWidth: cardWidth - padding * 6,
+                maxWidth: cardWidth - padding * 6,
             });
 
-            doc.setFontSize(7);
-            doc.setFont("helvetica", "normal");
-            /**
-             ** Se avanza a la siguiente columna.
-             ** Si ya se completó una fila (col >= cols), se reinicia la columna
-             ** y se baja una fila (row++). */
+            // Avanzar a la siguiente posición
             col++;
             if (col >= cols) {
-              col = 0;
-              row++;
-              x = margin;
-              y += cardHeight + 3;
+                col = 0;
+                row++;
+                x = margin;
+                y += cardHeight + 3;
             } else {
-              x += cardWidth + 5;
+                x += cardWidth + 5;
             }
-            /**
-             *^ Si ya se colocaron todas las filas posibles (16 tarjetas) y aún
-             *^ hay más tarjetas, se añade una nueva página. La posición se
-             *^ reinicia arriba (y = margin) porque solo la primera página tiene
-             *^ encabezado. */
+
+            // Manejar paginación
             if (row >= rows && i < cards.length - 1) {
-              doc.text(
-                "Página " + count,
-                pageWidth - margin * 3,
-                pageHeight - margin * 1.2,
-                { maxWidth: cardWidth - padding * 6 }
-              );
-              doc.addPage();
-              row = 0;
-              col = 0;
-              x = margin;
-              y = margin;
-              count++;
+                doc.text(
+                    "Página " + count,
+                    pageWidth - margin * 3,
+                    pageHeight - margin * 1.2,
+                    { maxWidth: cardWidth - padding * 6 }
+                );
+                doc.addPage();
+                row = 0;
+                col = 0;
+                x = margin;
+                y = margin;
+                count++;
             }
-          }
-
-          doc.save("catalogo_productos.pdf");
-        } catch (error) {
-          console.error("Error al generar PDF:", error);
         }
-      }
 
-      // Utilidad: convierte imagen externa a base64
+        // Añadir número de página a la última página
+        doc.text(
+            "Página " + count,
+            pageWidth - margin * 3,
+            pageHeight - margin * 1.2,
+            { maxWidth: cardWidth - padding * 6 }
+        );
+
+        doc.save("catalogo_productos.pdf");
+    } catch (error) {
+        console.error("Error al generar PDF:", error);
+    }
+}
+      
+      
+      
       async function toDataUrl(url) {
         const res = await fetch(url);
         /**

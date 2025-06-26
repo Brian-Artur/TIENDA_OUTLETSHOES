@@ -1227,11 +1227,13 @@ def get_image_by_season(referencia):
             A.FOTO,
             S.TALLA,
             S.STOCK,
-            PV.PBRUTO
+            PV.PBRUTO,
+            A.TEMPORADA
         FROM dbo.ARTICULOS A
         JOIN dbo.STOCKS S ON A.CODARTICULO = S.CODARTICULO
         LEFT JOIN dbo.PRECIOSVENTA PV ON A.CODARTICULO = PV.CODARTICULO AND S.TALLA = PV.TALLA
         WHERE A.TEMPORADA = ? AND S.STOCK > 0
+        ORDER BY A.REFPROVEEDOR
     """
 
     cursor.execute(query, (referencia,))
@@ -1239,17 +1241,18 @@ def get_image_by_season(referencia):
 
     imagenes = []
     if rows:
-        for cod, desc, descadic, foto, talla, stock, pbruto in rows:
+        for cod, desc, refProv, foto, talla, stock, pbruto, temporada in rows:
             foto_b64 = base64.b64encode(foto).decode("utf-8") if foto else None
             imagenes.append(
                 {
                     "codarticulo": cod,
                     "descripcion": desc,
-                    "descripcionadic": descadic,
+                    'referencia': refProv,
                     "foto": foto_b64,
                     "talla": talla,
                     "stock": stock,
                     "pbruto": float(pbruto) if pbruto is not None else None,
+                    'temporada': temporada,
                 }
             )
 
@@ -1292,7 +1295,7 @@ def get_catalogo_proveedor():
     if not proveedor:
         return jsonify({"error": "Falta el código de 'proveedor'"}), 400, cors_headers()
 
-    image_data = get_images_by_supplier(proveedor)
+    image_data = get_image_by_proveedor(proveedor)
 
     if image_data:
         return (
@@ -1310,7 +1313,8 @@ def get_catalogo_proveedor():
 
 
 
-def get_images_by_supplier(proveedor):
+
+def get_image_by_proveedor(codigo):
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -1322,37 +1326,88 @@ def get_images_by_supplier(proveedor):
             A.FOTO,
             S.TALLA,
             S.STOCK,
-            PV.PBRUTO
+            PV.PBRUTO,
+            A.TEMPORADA  -- Agregar el campo de temporada aquí
         FROM dbo.ARTICULOS A
         JOIN dbo.STOCKS S ON A.CODARTICULO = S.CODARTICULO
-        LEFT JOIN dbo.PRECIOSVENTA PV ON A.CODARTICULO = PV.CODARTICULO
+        LEFT JOIN dbo.PRECIOSVENTA PV 
+            ON A.CODARTICULO = PV.CODARTICULO 
+            AND S.TALLA = PV.TALLA
         WHERE 
             S.STOCK > 0
             AND (
-                LEFT(A.REFPROVEEDOR, 3) COLLATE Modern_Spanish_CI_AS = ?
+                 LEFT(A.REFPROVEEDOR, 3) COLLATE Modern_Spanish_CI_AS = ?
             )
+        ORDER BY A.REFPROVEEDOR
     """
-    cursor.execute(query, (proveedor))
+    cursor.execute(query, (codigo,))
     rows = cursor.fetchall()
 
     imagenes = []
     if rows:
-        for cod, desc, descadic, foto, talla, stock, pbruto in rows:
-            foto_b64 = base64.b64encode(foto).decode("utf-8") if foto else None
-            imagenes.append(
-                {
-                    "codarticulo": cod,
-                    "descripcion": desc,
-                    "descripcionadic": descadic,
-                    "foto": foto_b64,
-                    "talla": talla,
-                    "stock": stock,
-                    "pbruto": float(pbruto) if pbruto is not None else None
-                }
-            )
+        for cod, desc, refProv, foto, talla, stock, pbruto, temporada in rows:  # Agregar temporada aquí
+            foto_b64 = base64.b64encode(foto).decode('utf-8') if foto else None
+            imagenes.append({
+                'codarticulo': cod,
+                'descripcion': desc,
+                'referencia': refProv,
+                'foto': foto_b64,
+                'talla': talla,
+                'stock': stock,
+                "pbruto": float(pbruto) if pbruto is not None else None,
+                'temporada': temporada  # Incluir temporada en el diccionario
+            })
 
     return imagenes
 
+
+
+
+# def get_images_by_supplier(proveedor):
+#     conn = get_connection()
+#     cursor = conn.cursor()
+
+#     query = """
+#         SELECT 
+#             A.CODARTICULO,
+#             A.DESCRIPCION,
+#             A.REFPROVEEDOR,
+#             A.FOTO,
+#             A.TEMPORADA,  -- Nuevo campo añadido
+#             S.TALLA,
+#             S.STOCK,
+#             PV.PBRUTO
+#         FROM dbo.ARTICULOS A
+#         JOIN dbo.STOCKS S ON A.CODARTICULO = S.CODARTICULO
+#         LEFT JOIN dbo.PRECIOSVENTA PV ON A.CODARTICULO = PV.CODARTICULO
+#         WHERE 
+#             S.STOCK > 0
+#             AND (
+#                 LEFT(A.REFPROVEEDOR, 3) COLLATE Modern_Spanish_CI_AS = ?
+#             )
+#         ORDER BY A.REFPROVEEDOR
+#     """
+#     cursor.execute(query, (proveedor,))
+#     rows = cursor.fetchall()
+
+#     imagenes = []
+#     if rows:
+#         for cod, desc, descadic, foto, temporada, talla, stock, pbruto in rows:  # Añadido temporada
+#             foto_b64 = base64.b64encode(foto).decode("utf-8") if foto else None
+#             imagenes.append(
+#                 {
+#                     "codarticulo": cod,
+#                     "descripcion": desc,
+#                     "descripcionadic": descadic,
+#                     "foto": foto_b64,
+#                     "temporada": temporada,  # Nuevo campo en el JSON
+#                     "talla": talla,
+#                     "stock": stock,
+#                     "pbruto": float(pbruto) if pbruto is not None else None
+#                 }
+#             )
+
+#     return imagenes
 
 
 
