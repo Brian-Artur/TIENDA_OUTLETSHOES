@@ -8,7 +8,7 @@ import os
 
 import base64
 
-import random  
+import random
 
 app = Flask(__name__)
 
@@ -1216,13 +1216,12 @@ def get_foto_articulo():
         return jsonify({"error": "Imagen no encontrada"}), 404, cors_headers()
 
 
-
 # def get_image_by_season(referencia):
 #     conn = get_connection()
 #     cursor = conn.cursor()
 
 #     query = """
-#         SELECT 
+#         SELECT
 #             A.CODARTICULO,
 #             A.DESCRIPCION,
 #             A.REFPROVEEDOR,
@@ -1302,7 +1301,7 @@ def get_image_by_season(referencia, solo_rebajas=False):
             S.TALLA,
             S.STOCK,
             PV.PBRUTO,
-            NULL AS PV.PREB,  -- Añadimos el precio de rebajas
+            NULL AS PREB, 
             A.TEMPORADA
         FROM dbo.ARTICULOS A
         JOIN dbo.STOCKS S ON A.CODARTICULO = S.CODARTICULO
@@ -1319,17 +1318,28 @@ def get_image_by_season(referencia, solo_rebajas=False):
     if rows:
         for cod, desc, refProv, foto, talla, stock, pbruto, preb, temporada in rows:
             foto_b64 = base64.b64encode(foto).decode("utf-8") if foto else None
+
+            # Simular rebajas para el 30% de los artículos (misma lógica que en get_image_by_proveedor)
+            tiene_rebaja = random.random() > 0.7  # 30% de probabilidad
+            preb = (
+                float(pbruto) * 0.7 if (pbruto is not None and tiene_rebaja) else None
+            )
+
+            # Si se solicita solo rebajas y este artículo no tiene rebaja, lo saltamos
+            if solo_rebajas and not tiene_rebaja:
+                continue
+
             imagenes.append(
                 {
                     "codarticulo": cod,
                     "descripcion": desc,
-                    'referencia': refProv,
+                    "referencia": refProv,
                     "foto": foto_b64,
                     "talla": talla,
                     "stock": stock,
                     "pbruto": float(pbruto) if pbruto is not None else None,
                     "preb": preb,  # Precio rebajado simulado o null
-                    'temporada': temporada,
+                    "temporada": temporada,
                 }
             )
 
@@ -1347,7 +1357,7 @@ def get_catalogo_temporada():
 
     # Obtener parámetro de rebajas (por defecto False)
     solo_rebajas = request.args.get("rebajas", "false").lower() == "true"
-    
+
     image_data = get_image_by_season(referencia, solo_rebajas)
 
     if image_data:
@@ -1363,7 +1373,6 @@ def get_catalogo_temporada():
         )
     else:
         return jsonify({"error": "No se encontraron artículos"}), 404, cors_headers()
-    
 
 
 # @app.route("/catalogo-proveedor", methods=["GET", "OPTIONS"])
@@ -1392,14 +1401,12 @@ def get_catalogo_temporada():
 #         return jsonify({"error": "No se encontraron artículos"}), 404, cors_headers()
 
 
-
-
 # def get_image_by_proveedor(codigo):
 #     conn = get_connection()
 #     cursor = conn.cursor()
 
 #     query = """
-#         SELECT 
+#         SELECT
 #             A.CODARTICULO,
 #             A.DESCRIPCION,
 #             A.REFPROVEEDOR,
@@ -1410,10 +1417,10 @@ def get_catalogo_temporada():
 #             A.TEMPORADA  -- Agregar el campo de temporada aquí
 #         FROM dbo.ARTICULOS A
 #         JOIN dbo.STOCKS S ON A.CODARTICULO = S.CODARTICULO
-#         LEFT JOIN dbo.PRECIOSVENTA PV 
-#             ON A.CODARTICULO = PV.CODARTICULO 
+#         LEFT JOIN dbo.PRECIOSVENTA PV
+#             ON A.CODARTICULO = PV.CODARTICULO
 #             AND S.TALLA = PV.TALLA
-#         WHERE 
+#         WHERE
 #             S.STOCK > 0
 #             AND (
 #                  LEFT(A.REFPROVEEDOR, 3) COLLATE Modern_Spanish_CI_AS = ?
@@ -1454,7 +1461,7 @@ def get_image_by_proveedor(codigo, solo_rebajas=False):
             S.TALLA,
             S.STOCK,
             PV.PBRUTO,
-            NULL AS PV.PREB,  -- Añadimos el precio de rebajas
+            NULL AS PREB,  -- Añadimos el precio de rebajas
             A.TEMPORADA
         FROM dbo.ARTICULOS A
         JOIN dbo.STOCKS S ON A.CODARTICULO = S.CODARTICULO
@@ -1475,27 +1482,31 @@ def get_image_by_proveedor(codigo, solo_rebajas=False):
     imagenes = []
     if rows:
         for cod, desc, refProv, foto, talla, stock, pbruto, preb, temporada in rows:
-            foto_b64 = base64.b64encode(foto).decode('utf-8') if foto else None
+            foto_b64 = base64.b64encode(foto).decode("utf-8") if foto else None
 
             # Simular rebajas para el 30% de los artículos
             tiene_rebaja = random.random() > 0.7  # 30% de probabilidad
-            preb = float(pbruto) * 0.7 if (pbruto is not None and tiene_rebaja) else None
+            preb = (
+                float(pbruto) * 0.7 if (pbruto is not None and tiene_rebaja) else None
+            )
 
             # Si se solicita solo rebajas y este artículo no tiene rebaja, lo saltamos
             if solo_rebajas and not tiene_rebaja:
                 continue
 
-            imagenes.append({
-                'codarticulo': cod,
-                'descripcion': desc,
-                'referencia': refProv,
-                'foto': foto_b64,
-                'talla': talla,
-                'stock': stock,
-                "pbruto": float(pbruto) if pbruto is not None else None,
-                "preb": preb,
-                'temporada': temporada
-            })
+            imagenes.append(
+                {
+                    "codarticulo": cod,
+                    "descripcion": desc,
+                    "referencia": refProv,
+                    "foto": foto_b64,
+                    "talla": talla,
+                    "stock": stock,
+                    "pbruto": float(pbruto) if pbruto is not None else None,
+                    "preb": preb,
+                    "temporada": temporada,
+                }
+            )
 
     return imagenes
 
@@ -1511,7 +1522,7 @@ def get_catalogo_proveedor():
 
     # Obtener parámetro de rebajas (por defecto False)
     solo_rebajas = request.args.get("rebajas", "false").lower() == "true"
-    
+
     image_data = get_image_by_proveedor(proveedor, solo_rebajas)
 
     if image_data:
@@ -1527,14 +1538,14 @@ def get_catalogo_proveedor():
         )
     else:
         return jsonify({"error": "No se encontraron artículos"}), 404, cors_headers()
-    
+
 
 # def get_images_by_supplier(proveedor):
 #     conn = get_connection()
 #     cursor = conn.cursor()
 
 #     query = """
-#         SELECT 
+#         SELECT
 #             A.CODARTICULO,
 #             A.DESCRIPCION,
 #             A.REFPROVEEDOR,
@@ -1546,7 +1557,7 @@ def get_catalogo_proveedor():
 #         FROM dbo.ARTICULOS A
 #         JOIN dbo.STOCKS S ON A.CODARTICULO = S.CODARTICULO
 #         LEFT JOIN dbo.PRECIOSVENTA PV ON A.CODARTICULO = PV.CODARTICULO
-#         WHERE 
+#         WHERE
 #             S.STOCK > 0
 #             AND (
 #                 LEFT(A.REFPROVEEDOR, 3) COLLATE Modern_Spanish_CI_AS = ?
@@ -1574,7 +1585,6 @@ def get_catalogo_proveedor():
 #             )
 
 #     return imagenes
-
 
 
 # ruta prueba index
