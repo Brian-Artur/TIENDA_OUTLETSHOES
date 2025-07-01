@@ -2489,14 +2489,16 @@ function renderCatalogo(data) {
                 <div style="margin-top: auto; padding-top: 5px;">
                     <span style="font-size: 0.9em;">Precio:</span>
                     <div style="display: flex; flex-direction: column; align-items: center;">
-                        <span style="
+                        <span id="precio"
+                          style="
                             text-decoration: line-through;
                             color: #777;
                             font-size: 0.9em;
                         ">
                             ${articulo.pbruto != null ? articulo.pbruto.toFixed(2) + " €" : "Sin precio"}
                         </span>
-                        <span style="
+                        <span id="pdes"
+                          style="
                             font-weight: bold;
                             color: #e53935;
                             font-size: 1.1em;
@@ -2774,7 +2776,177 @@ function renderCatalogo(data) {
 
       // Utilidad: convierte imagen externa a base64
       
-      async function generarPDF() {
+//       async function generarPDF() {
+//     try {
+//         const { jsPDF } = window.jspdf;
+//         const doc = new jsPDF("p", "mm", "a4");
+//         const catalogoElement = document.getElementById("galeria");
+        
+//         if (!catalogoElement) {
+//             alert("No hay catálogo cargado.");
+//             return;
+//         }
+
+//         const cards = catalogoElement.querySelectorAll(".card");
+//         const title = document.getElementById("title-catalogo");
+
+//         // Configurar dimensiones y layout
+//         const pageWidth = doc.internal.pageSize.getWidth();
+//         const pageHeight = doc.internal.pageSize.getHeight();
+
+//         const margin = 5;
+//         const cols = 4;
+//         const rows = 4;
+
+//         const cardWidth = (pageWidth - margin * 2 - (cols - 1) * 5) / cols;
+//         const cardHeight = (pageHeight - margin * 2 - (rows - 1) * 10) / rows;
+
+//         let x = margin;
+//         let y = margin;
+//         let col = 0;
+//         let row = 0;
+//         let padding = 0.5;
+//         let count = 1;
+
+//         const fecha = new Date().toLocaleDateString("es-ES");
+
+//         // Añadir encabezado
+//         doc.setFontSize(16);
+//         doc.text(title.innerText, margin, 12);
+//         doc.setFontSize(10);
+//         doc.text(`Fecha: ${fecha}`, margin, 18);
+//         y = 20;
+
+//         for (let i = 0; i < cards.length; i++) {
+//             const card = cards[i];
+
+//             const imgEl = card.querySelector("img");
+//             const h3 = card.querySelector("h3");
+//             const tallasContainer = card.querySelector(".talla");
+
+//             const cod = h3?.textContent.trim() || "";
+//             const desc = card.querySelector("p")?.textContent.trim() || "";
+            
+//             // Obtener todas las tallas con sus cantidades
+//             let tallasText = "";
+//             if (tallasContainer) {
+//                 const tallasElements = tallasContainer.querySelectorAll("span");
+//                 tallasText = Array.from(tallasElements)
+//                     .map(el => el.textContent.trim())
+//                     .join(", ");
+//             }
+
+//             const precioSpan = card.querySelector("#precio");
+//             const precio = precioSpan?.textContent?.trim() || null;
+//             const precioFormateado = precio
+//                 ? `${parseFloat(precio).toFixed(2)} €`
+//                 : "Sin precio";
+
+//             // Procesar imagen
+//             const imgSrc = imgEl?.src || "";
+//             const isBase64 = imgSrc.startsWith("data:image");
+//             const finalImage = isBase64
+//                 ? imgSrc
+//                 : "http://localhost:5000/imagen-generica";
+
+//             let base64Image = finalImage;
+//             if (!isBase64) {
+//                 base64Image = await toDataUrl(finalImage);
+//             }
+
+//             // Insertar imagen
+//             const imgHeight = cardHeight * 0.6;
+//             doc.addImage(
+//                 base64Image,
+//                 "JPEG",
+//                 x + padding,
+//                 y + padding,
+//                 cardWidth - padding * 2,
+//                 imgHeight - padding
+//             );
+
+//             // Borde con esquinas redondeadas
+//             doc.setDrawColor(255, 255, 255);
+//             doc.setLineWidth(1.5);
+//             doc.roundedRect(x, y, cardWidth, cardHeight, 2.5, 2.5, "S");
+
+//             doc.setDrawColor(237, 232, 228);
+//             doc.setLineWidth(0.5);
+//             doc.roundedRect(x, y, cardWidth, cardHeight, 2.5, 2.5, "S");
+
+//             // Texto debajo de la imagen
+//             doc.setFontSize(12);
+//             doc.setFont("helvetica", "bold");
+//             doc.text(cod, x + padding * 3, y + imgHeight + 5, {
+//                 maxWidth: cardWidth - padding * 6,
+//             });
+            
+//             doc.setFontSize(7);
+//             doc.setFont("helvetica", "normal");
+//             doc.text(desc, x + padding * 3, y + imgHeight + 10, {
+//                 maxWidth: cardWidth - padding * 6,
+//             });
+            
+//             // Mostrar todas las tallas (puede ocupar varias líneas)
+//             const tallasLines = doc.splitTextToSize("Tallas: " + tallasText, cardWidth - padding * 6);
+//             doc.text(tallasLines, x + padding * 3, y + imgHeight + 16, {
+//                 maxWidth: cardWidth - padding * 6,
+//             });
+            
+//             doc.text("Precio: ", x + padding * 3, y + imgHeight + 22, {
+//                 maxWidth: cardWidth - padding * 6,
+//             });
+
+//             doc.setFontSize(8);
+//             doc.setFont("helvetica", "bold");
+//             doc.text(precioFormateado, x + 10, y + imgHeight + 22, {
+//                 maxWidth: cardWidth - padding * 6,
+//             });
+
+//             // Avanzar a la siguiente posición
+//             col++;
+//             if (col >= cols) {
+//                 col = 0;
+//                 row++;
+//                 x = margin;
+//                 y += cardHeight + 3;
+//             } else {
+//                 x += cardWidth + 5;
+//             }
+
+//             // Manejar paginación
+//             if (row >= rows && i < cards.length - 1) {
+//                 doc.text(
+//                     "Página " + count,
+//                     pageWidth - margin * 3,
+//                     pageHeight - margin * 1.2,
+//                     { maxWidth: cardWidth - padding * 6 }
+//                 );
+//                 doc.addPage();
+//                 row = 0;
+//                 col = 0;
+//                 x = margin;
+//                 y = margin;
+//                 count++;
+//             }
+//         }
+
+//         // Añadir número de página a la última página
+//         doc.text(
+//             "Página " + count,
+//             pageWidth - margin * 3,
+//             pageHeight - margin * 1.2,
+//             { maxWidth: cardWidth - padding * 6 }
+//         );
+
+//         doc.save("catalogo_productos.pdf");
+//     } catch (error) {
+//         console.error("Error al generar PDF:", error);
+//     }
+// }
+    
+
+async function generarPDF() {
     try {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF("p", "mm", "a4");
@@ -2834,11 +3006,19 @@ function renderCatalogo(data) {
                     .join(", ");
             }
 
+            // Obtener precios
             const precioSpan = card.querySelector("#precio");
             const precio = precioSpan?.textContent?.trim() || null;
             const precioFormateado = precio
                 ? `${parseFloat(precio).toFixed(2)} €`
                 : "Sin precio";
+            
+            // Obtener precio rebajado (si existe)
+            const precioRebajadoSpan = card.querySelector("#pdes");
+            const precioRebajado = precioRebajadoSpan?.textContent?.trim();
+            const precioRebajadoFormateado = precioRebajado 
+                ? `${parseFloat(precioRebajado).toFixed(2)} €`
+                : null;
 
             // Procesar imagen
             const imgSrc = imgEl?.src || "";
@@ -2885,21 +3065,52 @@ function renderCatalogo(data) {
                 maxWidth: cardWidth - padding * 6,
             });
             
-            // Mostrar todas las tallas (puede ocupar varias líneas)
+            // Mostrar todas las tallas
             const tallasLines = doc.splitTextToSize("Tallas: " + tallasText, cardWidth - padding * 6);
             doc.text(tallasLines, x + padding * 3, y + imgHeight + 16, {
                 maxWidth: cardWidth - padding * 6,
             });
             
-            doc.text("Precio: ", x + padding * 3, y + imgHeight + 22, {
-                maxWidth: cardWidth - padding * 6,
-            });
-
+            // Mostrar precios
+            const precioY = y + imgHeight + 22;
+            
+            // Precio normal
             doc.setFontSize(8);
-            doc.setFont("helvetica", "bold");
-            doc.text(precioFormateado, x + 10, y + imgHeight + 22, {
+            doc.setFont("helvetica", "normal");
+            doc.text("Precio: ", x + padding * 3, precioY, {
                 maxWidth: cardWidth - padding * 6,
             });
+            
+            doc.setFont("helvetica", "bold");
+            doc.text(precioFormateado, x + 10, precioY, {
+                maxWidth: cardWidth - padding * 6,
+            });
+            
+            // Precio rebajado (si existe)
+            if (precioRebajadoFormateado) {
+                const precioRebajadoX = x + 25; // Ajustar posición a la derecha
+                
+                // Tachar precio original
+                doc.setDrawColor(255, 0, 0);
+                doc.line(
+                    x + 10, 
+                    precioY - 1, 
+                    x + 10 + doc.getTextWidth(precioFormateado), 
+                    precioY - 1
+                );
+                
+                // Mostrar precio rebajado
+                doc.setFontSize(10); // Más grande
+                doc.setTextColor(255, 0, 0); // Rojo
+                doc.setFont("helvetica", "bold");
+                doc.text(precioRebajadoFormateado, precioRebajadoX, precioY, {
+                    maxWidth: cardWidth - padding * 6,
+                });
+                
+                // Restaurar color para otros elementos
+                doc.setTextColor(0, 0, 0);
+                doc.setFontSize(8);
+            }
 
             // Avanzar a la siguiente posición
             col++;
@@ -2942,7 +3153,7 @@ function renderCatalogo(data) {
         console.error("Error al generar PDF:", error);
     }
 }
-      
+
       
       
       async function toDataUrl(url) {
