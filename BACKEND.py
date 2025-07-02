@@ -5,7 +5,7 @@ import io
 from flask import send_file
 from flask_cors import CORS
 import os
-
+import random
 import base64
 
 app = Flask(__name__)
@@ -20,7 +20,7 @@ def imagen_generica():
     return send_file(ruta, mimetype="image/jpg")
 
 # Conectar a la base de datos en remoto
-DB_CONFIG = {
+"""DB_CONFIG = {
     'server': 'SERVIDOR\\BREOGAN',
     'database': 'CENTRALBREOGAN',
     'username': 'sa',
@@ -37,10 +37,10 @@ def get_connection():
         f"PWD={DB_CONFIG['password']}"
         
     )
-    return pyodbc.connect(conn_str)
+    return pyodbc.connect(conn_str)"""
 
 # Conectar a la base de datos en local
-""" DB_CONFIG = {
+DB_CONFIG = {
     'server': 'localhost',
     'database': 'CENTRALBREOGAN',
     'driver': '{ODBC Driver 17 for SQL Server}',
@@ -53,7 +53,7 @@ def get_connection():
         f"DATABASE={DB_CONFIG['database']};"
         f"Trusted_Connection=yes;"
     )
-    return pyodbc.connect(conn_str) """
+    return pyodbc.connect(conn_str)
 
 
 
@@ -1118,7 +1118,7 @@ def get_foto_articulo():
 
 # Mi codigo
 # Función para obtener imagen según temporada
-def get_image_by_season(referencia):
+def get_image_by_season(referencia, solo_rebajas=False):
     conn = get_connection()
     cursor = conn.cursor()
     query = """
@@ -1129,7 +1129,9 @@ def get_image_by_season(referencia):
             A.FOTO,
             S.TALLA,
             S.STOCK,
-            PV.PBRUTO
+            PV.PBRUTO,
+            NULL AS PREB,
+            A.TEMPORADA
         FROM dbo.ARTICULOS A
         JOIN dbo.STOCKS S ON A.CODARTICULO = S.CODARTICULO
         LEFT JOIN dbo.PRECIOSVENTA PV ON A.CODARTICULO = PV.CODARTICULO AND S.TALLA = PV.TALLA
@@ -1142,7 +1144,15 @@ def get_image_by_season(referencia):
     # lista para guardar las imagenes transformadas
     imagenes = []
     if rows:
-        for cod, desc, refProv, foto, talla, stock, pbruto in rows:
+        for cod, desc, refProv, foto, talla, stock, pbruto, preb_db, temporada in rows:
+            # Lógica de rebajas
+            if preb_db is None:  # Si no hay dato en BD, simulamos
+                tiene_rebaja = random.random() <= 0.25
+                preb = float(pbruto) * 0.75 if (pbruto is not None and tiene_rebaja) else None
+            else:  # Cuando exista en BD, usamos el valor real
+                tiene_rebaja = preb_db is not None
+                preb = float(preb_db) if preb_db is not None else None
+
             # Convertimos FOTO (bytes) a base64
             foto_b64 = base64.b64encode(foto).decode('utf-8') if foto else None
             imagenes.append({
@@ -1153,7 +1163,9 @@ def get_image_by_season(referencia):
                 'talla': talla,
                 'stock': stock,
                 "pbruto": float(pbruto) if pbruto is not None else None,
-
+                "preb": preb,  # Nuevo campo
+                "tiene_rebaja": tiene_rebaja,  # Booleano útil para filtrar
+                'temporada': temporada  
             })
             
         return imagenes
@@ -1164,6 +1176,10 @@ def get_image_by_season(referencia):
 def get_catalogo_temporada():
     if request.method == 'OPTIONS':
         return '', 200, cors_headers()
+    
+    solo_rebajas = request.args.get('solo_rebajas', 'false').lower() == 'true'
+    
+    image_data = get_image_by_season(referencia, solo_rebajas=solo_rebajas)
 
     referencia = request.args.get('referencia')
     if not referencia:
@@ -1180,7 +1196,7 @@ def get_catalogo_temporada():
         return jsonify({"error": "No se encontraron artículos"}), 404, cors_headers()
 
 # Función para obtener imagen según proveedor
-def get_image_by_proveedor(codigo):
+def get_image_by_proveedor(codigo, solo_rebajas=False):
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -1193,7 +1209,8 @@ def get_image_by_proveedor(codigo):
             S.TALLA,
             S.STOCK,
             PV.PBRUTO,
-            A.TEMPORADA  -- Agregar el campo de temporada aquí
+            NULL AS PREB,  -- Campo reservado para futuro
+            A.TEMPORADA
         FROM dbo.ARTICULOS A
         JOIN dbo.STOCKS S ON A.CODARTICULO = S.CODARTICULO
         LEFT JOIN dbo.PRECIOSVENTA PV 
@@ -1211,7 +1228,20 @@ def get_image_by_proveedor(codigo):
 
     imagenes = []
     if rows:
-        for cod, desc, refProv, foto, talla, stock, pbruto, temporada in rows:  # Agregar temporada aquí
+        for cod, desc, refProv, foto, talla, stock, pbruto, preb_db, temporada in rows: 
+
+             # Lógica de rebajas (SIMULACIÓN si preb_db es NULL)
+            if preb_db is None:
+                tiene_rebaja = random.random() <= 0.25  # 25% probabilidad
+                preb = float(pbruto) * 0.75 if (pbruto is not None and tiene_rebaja) else None
+            else:
+                tiene_rebaja = preb_db is not None
+                preb = float(preb_db) if preb_db is not None else None
+
+            # Si solo_rebajas=True y no tiene rebaja, saltamos este artículo
+            if solo_rebajas and not tiene_rebaja:
+                continue
+
             foto_b64 = base64.b64encode(foto).decode('utf-8') if foto else None
             imagenes.append({
                 'codarticulo': cod,
@@ -1220,7 +1250,6 @@ def get_image_by_proveedor(codigo):
                 'foto': foto_b64,
                 'talla': talla,
                 'stock': stock,
-                "pbruto": float(pbruto) if pbruto is not None else None,
                 'temporada': temporada  # Incluir temporada en el diccionario
             })
 
@@ -1234,10 +1263,12 @@ def get_catalogo_proveedor():
         return '', 200, cors_headers()
 
     codigo = request.args.get('codigo')
+    solo_rebajas = request.args.get('solo_rebajas', 'false').lower() == 'true'  # Nuevo parámetro
+
     if not codigo:
         return jsonify({"error": "Falta el código de proveedor"}), 400, cors_headers()
 
-    image_data = get_image_by_proveedor(codigo)
+    image_data = get_image_by_proveedor(codigo, solo_rebajas=solo_rebajas)  # Pasamos el parámetro
 
     if image_data:
         return jsonify({
@@ -1245,7 +1276,8 @@ def get_catalogo_proveedor():
             'data': image_data
         }), 200, cors_headers()
     else:
-        return jsonify({"error": "No se encontraron artículos para el proveedor"}), 404, cors_headers()
+        error_msg = "No se encontraron artículos" + (" en rebaja" if solo_rebajas else "")
+        return jsonify({"error": error_msg}), 404, cors_headers()
 
 
 # Fin mi codigo    

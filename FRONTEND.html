@@ -1731,7 +1731,13 @@ document.getElementById("btn-catalog").addEventListener("click", () => {
         font-family: sans-serif;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
     `;
-    content.innerHTML = `<p>¿Cómo deseas consultar el catálogo?</p>`;
+    content.innerHTML = `
+        <p>¿Cómo deseas consultar el catálogo?</p>
+        <label style="display: inline-block; margin: 15px 0; cursor: pointer;">
+        <input type="checkbox" id="chk-rebajas" style="margin-right: 5px;">
+            Mostrar solo artículos en rebaja
+        </label>
+    `;
 
     const btnsContainer = document.createElement("div");
     btnsContainer.style = `margin-top: 10px;`;
@@ -1752,6 +1758,7 @@ document.getElementById("btn-catalog").addEventListener("click", () => {
 
     const handleSeleccion = async (tipoSeleccionado) => {
         document.body.removeChild(modal);
+        const soloRebajas = document.getElementById('chk-rebajas').checked; // Capturar estado del checkbox
 
         const codigo = prompt(`Introduce el código de ${tipoSeleccionado === "T" ? "TEMPORADA" : "PROVEEDOR"}:`)?.toUpperCase();
         if (!codigo || codigo.trim() === "") {
@@ -1762,17 +1769,17 @@ document.getElementById("btn-catalog").addEventListener("click", () => {
         tableContainer.innerHTML = "Cargando imágenes del catálogo...";
 
         //ruta para pruebas en local para desarrollo
-        /* const ruta = tipoSeleccionado === "T"
-            ? `http://localhost:5000/catalogo-temporada?referencia=${codigo}`
-            : `http://localhost:5000/catalogo-proveedor?codigo=${codigo}`; */ 
-        //ruta remota para probar en producción https://abincodigital.loclx.io 
         const ruta = tipoSeleccionado === "T"
+            ? `http://localhost:5000/catalogo-temporada?referencia=${codigo}`
+            : `http://localhost:5000/catalogo-proveedor?codigo=${codigo}`; 
+        //ruta remota para probar en producción https://abincodigital.loclx.io 
+        /*const ruta = tipoSeleccionado === "T"
             ? `https://abincodigital.loclx.io/catalogo-temporada?referencia=${codigo}`
-            : `https://abincodigital.loclx.io/catalogo-proveedor?codigo=${codigo}`;  
+            : `https://abincodigital.loclx.io/catalogo-proveedor?codigo=${codigo}`;  */
 
         // Añadir parámetro de rebajas si está activado
         if (soloRebajas) {
-            url += `&rebajas=true`;
+            ruta += `&rebajas=true`;
         }
        
         try {
@@ -1789,8 +1796,8 @@ document.getElementById("btn-catalog").addEventListener("click", () => {
 
             //Aplicar filtro solo si es búsqueda por proveedor
             if (tipoSeleccionado === "P") {
-            generarCheckboxCatalogoTemporadas(result.data);
-        }
+                generarCheckboxCatalogoTemporadas(result.data);
+            }
 
         } catch (error) {
             tableContainer.innerHTML = `<p class="error">Error: ${error.message}</p>`;
@@ -1834,7 +1841,7 @@ function filtrarCatalogoPorTemporada() {
 }
 
 
-//Función modificada para incluir cantidad de stock por tallas entre parentesis
+// Función modificada para mostrar precios con descuento
 function renderCatalogo(data) {
     if (!Array.isArray(data) || data.length === 0) return "<p>Sin datos</p>";
 
@@ -1851,8 +1858,8 @@ function renderCatalogo(data) {
                 referencia: item.referencia,
                 foto: item.foto,
                 pbruto: item.pbruto,
-                preb: item.preb,  // Añadimos el precio rebajado
-                tallas: {}, // ← cambiamos de Set a objeto
+                preb: item.preb,
+                tallas: {},
                 temporada: item.temporada
             });
         }
@@ -1876,13 +1883,38 @@ function renderCatalogo(data) {
             ? `data:image/jpeg;base64,${articulo.foto}`
             : imagenGenerica;
 
-        const precio = articulo.pbruto !== null
-            ? `<p style="font-weight: bold; color: #222; margin: 8px 0 0; text-align: left;">PVP: ${articulo.pbruto.toFixed(2)} €</p>`
-            : "";
+        // Mostrar precio normal o con descuento
+        let precioHTML = '';
+        if (articulo.pbruto !== null) {
+            if (articulo.preb !== null) {
+                // Mostrar ambos precios si hay descuento
+                precioHTML = `
+                    <p style="font-weight: bold; color: #222; margin: 8px 0 0; text-align: left;">
+                        <span style="text-decoration: line-through; font-size: 0.9em;">${articulo.pbruto.toFixed(2)} €</span>
+                        <span id="pdes" style="color: red; font-size: 1.2em; margin-left: 8px;">${articulo.preb.toFixed(2)} €</span>
+                    </p>
+                    <p style="color: red; font-size: 0.8em; margin-top: 2px; text-align: left;">
+                        ¡25% DE DESCUENTO!
+                    </p>
+                `;
+            } else {
+                // Solo precio normal
+                precioHTML = `
+                    <p style="font-weight: bold; color: #222; margin: 8px 0 0; text-align: left;">
+                        PVP: ${articulo.pbruto.toFixed(2)} €
+                    </p>
+                `;
+            }
+        }
 
         const tallasTexto = Object.entries(articulo.tallas)
             .map(([talla, cantidad]) => `${talla} (${cantidad})`)
             .join(', ');
+
+        // Añadir borde rojo si está en rebaja
+        const cardStyle = articulo.preb !== null 
+            ? "border: 2px solid red; background: #fff9f9;" 
+            : "";
 
         html += `
             <div class="card" data-temporada="${articulo.temporada || ''}" style="
@@ -1892,6 +1924,7 @@ function renderCatalogo(data) {
                 padding: 15px;
                 text-align: center;
                 transition: transform 0.2s;
+                ${cardStyle}
             "
             onmouseover="this.style.transform='scale(1.02)'"
             onmouseout="this.style.transform='scale(1)'"
@@ -1902,7 +1935,7 @@ function renderCatalogo(data) {
     
                 <h3 style="margin: 10px 0 5px;">${articulo.referencia}</h3>
                 <p style="color: #666; font-size: 0.9em; text-align: left;">${articulo.descripcion}</p>
-                ${precio}
+                ${precioHTML}
                 <div style="margin-top: 10px;">
                     <span style="font-weight: bold;">Tallas disponibles:</span><br>
                     <span style="display: inline-block; margin-top: 5px; color: #444;">
