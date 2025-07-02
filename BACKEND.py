@@ -1,18 +1,32 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 import pyodbc
 from datetime import datetime
 import io
 from flask import send_file
+from flask_cors import CORS
+import os
+
+import base64
 
 app = Flask(__name__)
 
+# mi codigo
+CORS(app)  # Esto permite CORS en todas las rutas
+
+@app.route("/imagen-generica")
+def imagen_generica():
+    # ruta = os.path.join(os.path.dirname(__file__), "img", "articulo-sin-foto.png")
+    ruta = os.path.join(os.path.dirname(__file__), "img", "foto.jpg")
+    return send_file(ruta, mimetype="image/jpg")
+
+# Conectar a la base de datos en remoto
 DB_CONFIG = {
     'server': 'SERVIDOR\\BREOGAN',
     'database': 'CENTRALBREOGAN',
     'username': 'sa',
     'password': 'masterkey',
     'driver': '{ODBC Driver 17 for SQL Server}'
-}
+} 
 
 def get_connection():
     conn_str = (
@@ -21,8 +35,26 @@ def get_connection():
         f"DATABASE={DB_CONFIG['database']};"
         f"UID={DB_CONFIG['username']};"
         f"PWD={DB_CONFIG['password']}"
+        
     )
     return pyodbc.connect(conn_str)
+
+# Conectar a la base de datos en local
+""" DB_CONFIG = {
+    'server': 'localhost',
+    'database': 'CENTRALBREOGAN',
+    'driver': '{ODBC Driver 17 for SQL Server}',
+}
+
+def get_connection():
+    conn_str = (
+        f"DRIVER={DB_CONFIG['driver']};"
+        f"SERVER={DB_CONFIG['server']};"
+        f"DATABASE={DB_CONFIG['database']};"
+        f"Trusted_Connection=yes;"
+    )
+    return pyodbc.connect(conn_str) """
+
 
 
 @app.route('/ventas', methods=['GET', 'OPTIONS'])
@@ -1084,6 +1116,139 @@ def get_foto_articulo():
     else:
         return jsonify({"error": "Imagen no encontrada"}), 404, cors_headers()
 
+# Mi codigo
+# Función para obtener imagen según temporada
+def get_image_by_season(referencia):
+    conn = get_connection()
+    cursor = conn.cursor()
+    query = """
+        SELECT 
+            A.CODARTICULO,
+            A.DESCRIPCION,
+            A.REFPROVEEDOR,
+            A.FOTO,
+            S.TALLA,
+            S.STOCK,
+            PV.PBRUTO
+        FROM dbo.ARTICULOS A
+        JOIN dbo.STOCKS S ON A.CODARTICULO = S.CODARTICULO
+        LEFT JOIN dbo.PRECIOSVENTA PV ON A.CODARTICULO = PV.CODARTICULO AND S.TALLA = PV.TALLA
+        WHERE A.TEMPORADA = ? AND S.STOCK > 0
+        ORDER BY A.REFPROVEEDOR
+    """
+    cursor.execute(query, (referencia,))
+    rows = cursor.fetchall()
+
+    # lista para guardar las imagenes transformadas
+    imagenes = []
+    if rows:
+        for cod, desc, refProv, foto, talla, stock, pbruto in rows:
+            # Convertimos FOTO (bytes) a base64
+            foto_b64 = base64.b64encode(foto).decode('utf-8') if foto else None
+            imagenes.append({
+                'codarticulo': cod,
+                'descripcion': desc,
+                'referencia': refProv,
+                'foto': foto_b64,
+                'talla': talla,
+                'stock': stock,
+                "pbruto": float(pbruto) if pbruto is not None else None,
+
+            })
+            
+        return imagenes
+
+
+# Ruta para obtener catalago imagenes por temporada
+@app.route('/catalogo-temporada', methods=['GET', 'OPTIONS'])
+def get_catalogo_temporada():
+    if request.method == 'OPTIONS':
+        return '', 200, cors_headers()
+
+    referencia = request.args.get('referencia')
+    if not referencia:
+        return jsonify({"error": "Falta el código de 'temporada'"}), 400, cors_headers()
+    
+    image_data = get_image_by_season(referencia)
+
+    if image_data:
+        return jsonify({
+            'message': f'{len(image_data)} artículos encontrados',
+            'data': image_data
+        }), 200, cors_headers()
+    else:
+        return jsonify({"error": "No se encontraron artículos"}), 404, cors_headers()
+
+# Función para obtener imagen según proveedor
+def get_image_by_proveedor(codigo):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    query = """
+        SELECT 
+            A.CODARTICULO,
+            A.DESCRIPCION,
+            A.REFPROVEEDOR,
+            A.FOTO,
+            S.TALLA,
+            S.STOCK,
+            PV.PBRUTO,
+            A.TEMPORADA  -- Agregar el campo de temporada aquí
+        FROM dbo.ARTICULOS A
+        JOIN dbo.STOCKS S ON A.CODARTICULO = S.CODARTICULO
+        LEFT JOIN dbo.PRECIOSVENTA PV 
+            ON A.CODARTICULO = PV.CODARTICULO 
+            AND S.TALLA = PV.TALLA
+        WHERE 
+            S.STOCK > 0
+            AND (
+                 LEFT(A.REFPROVEEDOR, 3) COLLATE Modern_Spanish_CI_AS = ?
+            )
+        ORDER BY A.REFPROVEEDOR    
+    """
+    cursor.execute(query, (codigo,))
+    rows = cursor.fetchall()
+
+    imagenes = []
+    if rows:
+        for cod, desc, refProv, foto, talla, stock, pbruto, temporada in rows:  # Agregar temporada aquí
+            foto_b64 = base64.b64encode(foto).decode('utf-8') if foto else None
+            imagenes.append({
+                'codarticulo': cod,
+                'descripcion': desc,
+                'referencia': refProv,
+                'foto': foto_b64,
+                'talla': talla,
+                'stock': stock,
+                "pbruto": float(pbruto) if pbruto is not None else None,
+                'temporada': temporada  # Incluir temporada en el diccionario
+            })
+
+    return imagenes
+
+
+# Ruta para obtener catálogo de imagenes por proveedor
+@app.route('/catalogo-proveedor', methods=['GET', 'OPTIONS'])
+def get_catalogo_proveedor():
+    if request.method == 'OPTIONS':
+        return '', 200, cors_headers()
+
+    codigo = request.args.get('codigo')
+    if not codigo:
+        return jsonify({"error": "Falta el código de proveedor"}), 400, cors_headers()
+
+    image_data = get_image_by_proveedor(codigo)
+
+    if image_data:
+        return jsonify({
+            'message': f'{len(image_data)} artículos encontrados',
+            'data': image_data
+        }), 200, cors_headers()
+    else:
+        return jsonify({"error": "No se encontraron artículos para el proveedor"}), 404, cors_headers()
+
+
+# Fin mi codigo    
 
 @app.route('/formas-pago/resumen', methods=['GET', 'OPTIONS'])
 def resumen_formas_pago():

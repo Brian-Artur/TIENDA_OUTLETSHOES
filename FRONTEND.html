@@ -121,103 +121,156 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
-
+<!--mi codigo-->
+<!--Añadido script para importar la libreia que usa excel-->
+ <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
 
 <script>
 let lastHistoricoData = [];
 
-function exportarTablaAExcel() {
+
+//funcion nueva de exportar a excel que sustituye a la de arriba
+//Esta genera un archivo xlsx, de excel
+/* function exportarTablaAExcel() {
     const tabla = document.querySelector("#table-container table");
     if (!tabla) return alert("No hay tabla para exportar.");
 
-    let csv = [];
-    for (let fila of tabla.rows) {
-        let row = [];
-        for (let celda of fila.cells) {
-            row.push('"' + celda.innerText.replace(/"/g, '""') + '"');
-        }
-        csv.push(row.join(","));
-    }
+    const workbook = XLSX.utils.table_to_book(tabla);
+    XLSX.writeFile(workbook, "existencias.xlsx");
+} */
 
-    const blob = new Blob([csv.join("\n")], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
 
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "existencias.csv";
-    link.click();
-}
+        //opcion para no usar la libreria de excel. Esta genera un archivo csv
+       function exportarTablaAExcel() {
+        const tabla = document.querySelector("#table-container table");
+         if (!tabla) return alert("No hay tabla para exportar.");
 
+         let csv = [];
+        for (let fila of tabla.rows) {
+           let row = [];
+           for (let celda of fila.cells) {
+             row.push('"' + celda.innerText.replace(/"/g, '""') + '"');
+           }
+           csv.push(row.join(";"));
+         }
+
+         const bom = '\uFEFF';
+         const blob = new Blob([bom + csv.join("\n")], {
+           type: "text/csv;charset=utf-8;",
+         });
+
+         const url = URL.createObjectURL(blob);
+
+         const link = document.createElement("a");
+         link.href = url;
+         link.download = "existencias.csv";
+         link.click();
+       }
+
+
+//Función para exportar a PDF
+//Ahora usa canvas para exportar a pdf, tendrá pequeño corte en cambio de paginas
 async function exportarTablaAPDF() {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+    try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({
+            orientation: "landscape",
+            unit: "pt",
+            format: "a4"
+        });
 
-    const tabla = document.querySelector("#table-container table");
-    if (!tabla) {
-        alert("No hay tabla para exportar.");
-        return;
-    }
+        // 1. Configuración del contenedor
+        const container = document.getElementById("table-container");
+        const originalOverflow = container.style.overflow;
+        container.style.overflow = "visible";
 
-    const fechaInicio = document.getElementById("fecha-ventas")?.value || "Fecha inicio no seleccionada";
-    const fechaFin = document.getElementById("fecha-final")?.value || "Fecha final no seleccionada";
+        // 2. Captura con html2canvas (configuración mejorada)
+        const canvas = await html2canvas(container, {
+            scale: 2, // Aumentamos la escala para mejor calidad
+            logging: true,
+            scrollX: 0,
+            scrollY: 0,
+            windowWidth: container.scrollWidth,
+            windowHeight: container.scrollHeight,
+            useCORS: true,
+            letterRendering: true
+        });
 
-    const filas = Array.from(tabla.querySelectorAll("tr"));
-    const headRows = [];
-    const bodyRows = [];
-    let inHeader = true;
+        // 3. Restaurar estilos
+        container.style.overflow = originalOverflow;
 
-    for (const fila of filas) {
-        const row = [];
-        for (const cell of fila.children) {
-            const colspan = parseInt(cell.getAttribute("colspan") || "1");
-            const text = cell.innerText.trim();
-            for (let i = 0; i < colspan; i++) {
-                row.push(i === 0 ? text : "");
+        // 4. Dividir en páginas CON duplicado controlado
+        const imgData = canvas.toDataURL("image/png");
+        const imgWidth = doc.internal.pageSize.getWidth() - 40;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        
+        const pageHeight = doc.internal.pageSize.getHeight() - 40;
+        let currentPosition = 0;
+        let pageNumber = 1;
+        let lastRowPosition = 0;
+
+        // Altura estimada de una fila (ajusta este valor según tu tabla)
+        const estimatedRowHeight = 30;
+
+        while (currentPosition < imgHeight) {
+            if (pageNumber > 1) {
+                doc.addPage();
+                
+                // Dibujamos SOLO el último registro de la página anterior
+                doc.addImage(
+                    imgData,
+                    "PNG",
+                    20, // posición X
+                    20, // posición Y (fija para el duplicado)
+                    imgWidth,
+                    estimatedRowHeight * 1.5, // altura para 1-2 filas
+                    undefined, undefined, undefined, undefined,
+                    // Crop: solo mostrar el último registro
+                    0,
+                    lastRowPosition - estimatedRowHeight/2, // ajuste fino
+                    canvas.width,
+                    estimatedRowHeight * 2
+                );
             }
+            
+            // Calcular altura visible
+            const remainingHeight = imgHeight - currentPosition;
+            let visibleHeight = Math.min(pageHeight, remainingHeight);
+            
+            // Ajuste para no cortar filas
+            if (remainingHeight > visibleHeight) {
+                // Reducimos la altura visible para que termine en un corte limpio
+                const rowsInPage = Math.floor(visibleHeight / estimatedRowHeight);
+                visibleHeight = rowsInPage * estimatedRowHeight;
+            }
+            
+            // Dibujar contenido principal
+            doc.addImage(
+                imgData,
+                "PNG",
+                20,
+                20 - currentPosition,
+                imgWidth,
+                imgHeight
+            );
+            
+            // Guardar posición del último registro visible
+            lastRowPosition = currentPosition + visibleHeight;
+            
+            // Avanzar posición
+            currentPosition += visibleHeight;
+            pageNumber++;
         }
 
-        if (inHeader && fila.querySelectorAll("th").length > 0) {
-            headRows.push(row);
-        } else {
-            inHeader = false;
-            bodyRows.push(row);
-        }
+        doc.save("informe-con-duplicado-controlado.pdf");
+
+    } catch (error) {
+        console.error("Error generando PDF:", error);
+        alert("Error al generar PDF. Ver consola para detalles.");
     }
-
-    // Dibujar encabezado solo en la primera hoja
-    const marginLeft = 40;
-    const headerStartY = 40;
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
-    doc.setTextColor(40);
-    doc.text("CUADRO DE BENEFICIOS POR PROVEEDOR - CALZADOS BREOGÁN, S.L.", marginLeft, headerStartY);
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.text(`Fechas seleccionadas: ${fechaInicio} a ${fechaFin}`, marginLeft, headerStartY + 20);
-
-    // Dibujar tabla dejando espacio para el encabezado solo en la primera página
-    doc.autoTable({
-        head: headRows,
-        body: bodyRows,
-        startY: headerStartY + 40,
-        margin: { left: marginLeft, right: marginLeft },
-        theme: "grid",
-        styles: {
-            fontSize: 6,
-            cellPadding: 2,
-            overflow: "linebreak"
-        },
-        headStyles: {
-            fillColor: [230, 230, 230],
-            textColor: 20,
-            fontSize: 7
-        }
-    });
-
-    doc.save("cuadro-beneficios.pdf");
 }
+
+//fin mi codigo
 
 </script>
 
@@ -252,6 +305,8 @@ async function exportarTablaAPDF() {
                     <button id="btn-consulta" class="benefits-button" style="background-color: orange;">Consulta</button>
                     <button id="fetch-report" class="report-button">Existencias</button>
                     <button id="btn-historico" class="benefits-button">Histórico</button>
+                    <button id="btn-catalog" class="benefits-button">Catálgo productos</button><!-- Mi codigo -->
+
                     <!--<button id="btn-beneficios" class="benefits-button" style="background-color: #444;">Informe por Proveedores</button>-->
                     <!--<button id="btn-beneficios-temporadas" class="benefits-button" style="background-color: #444;">Informe por Temporadas</button>-->
                     <!--<button id="btn-cierres-caja" class="benefits-button" style="background-color: #444;">Cierres de Caja</button>-->
@@ -262,12 +317,13 @@ async function exportarTablaAPDF() {
                     <button onclick="imprimirTicket()">Imprimir Artículos Vendidos</button>
                     <button onclick="exportarTablaAExcel()">Exportar a Excel</button>
                     <button onclick="exportarTablaAPDF()">Exportar a PDF</button>
+                    <button id="btn-export-pdf">Exportar catálogo a PDF</button><!-- Mi codigo -->
                 </div>
             </div>
         </div>
 
         <div id="filtros-temporada" style="margin: 15px 0;"></div>
-<div id="table-container">Click para obtener los registros...</div>
+        <div id="table-container">Click para obtener los registros...</div>
     </div>
 
     <script>
@@ -283,6 +339,20 @@ async function exportarTablaAPDF() {
         const fetchButton = document.getElementById('fetch-json');
         const reportButton = document.getElementById('fetch-report');
         const tableContainer = document.getElementById('table-container');
+        const catalogbutton = document.getElementById('btn-catalog');//Mi codigo
+
+    //funcion para esperar imgenes del contenedor //Mi codigo
+    function esperarImagenesCargadas(contenedor) {
+        const imagenes = contenedor.querySelectorAll("img");
+        const promesas = Array.from(imagenes).map(img => {
+            if (img.complete && img.naturalHeight !== 0) return Promise.resolve();
+            return new Promise(resolve => {
+                img.onload = img.onerror = resolve;
+            });
+        });
+    return Promise.all(promesas);
+    }
+    //fin mi codigo
 
         // Función para obtener ventas realizadas
         async function fetchLambdaResult() {
@@ -314,7 +384,7 @@ async function exportarTablaAPDF() {
             try {
                 const proveedor = (prompt("Introduce los 3 caracteres identificativos del proveedor:") || "").trim().toUpperCase();
                 if (!proveedor || proveedor.trim() === "") {
-        document.getElementById("filtros-temporada").innerHTML = "";
+                    document.getElementById("filtros-temporada").innerHTML = "";
                     tableContainer.innerHTML = '<p class="error">Informe cancelado. No se proporcionó un proveedor.</p>';
                     return;
                 }
@@ -343,7 +413,7 @@ async function exportarTablaAPDF() {
 
         // Función para renderizar la tabla con múltiples registros
         function renderTable(data) {
-    document.getElementById("filtros-temporada").innerHTML = "";
+        document.getElementById("filtros-temporada").innerHTML = "";
             if (!data || !Array.isArray(data)) {
                 tableContainer.innerHTML = '<p class="error">Invalid "data" field.</p>';
                 return;
@@ -399,152 +469,109 @@ async function exportarTablaAPDF() {
 //document.getElementById("filtros-temporada").innerHTML = filtrosHtml;
 tableContainer.innerHTML = tableHtml;
 
-// Agregar evento de doble clic a cada referencia
-    const referenciaCells = document.querySelectorAll('.referencia-cell');
-    referenciaCells.forEach(cell => {
-        cell.addEventListener('dblclick', function() {
-            const referencia = this.getAttribute('data-referencia');
-            showArticuloImage(referencia);  // Llamar a la función para obtener la imagen
+        // Agregar evento de doble clic a cada referencia
+        const referenciaCells = document.querySelectorAll('.referencia-cell');
+        referenciaCells.forEach(cell => {
+            cell.addEventListener('dblclick', function() {
+                const referencia = this.getAttribute('data-referencia');
+                showArticuloImage(referencia);  // Llamar a la función para obtener la imagen
+            });
         });
-    });
-        }
+    }
 
-        // Función para renderizar la tabla de existencias
-        let existenciasOriginales = [];
 
+// Función para renderizar la tabla de existencias
+let existenciasOriginales = [];
+
+//mi codigo
+//funcion de arriba, renderTablaExistencias para no mostrar columnas vacias
 function renderTableExistencias(data) {
     setTimeout(() => {
         generarCheckboxTemporadas();
     }, 100);
-            if (!data || !Array.isArray(data)) {
-                tableContainer.innerHTML = '<p class="error">Invalid "data" field.</p>';
-                return;
-            }
 
-            // Obtener proveedores únicos
-            const proveedoresUnicos = Array.from(new Set(data.map(item => item.PROVEEDOR).filter(Boolean)));
+    if (!data || !Array.isArray(data)) {
+        tableContainer.innerHTML = '<p class="error">Invalid "data" field.</p>';
+        return;
+    }
 
-            // Crear una fila superior de título
-            const filaProveedor = `
+    // Obtener proveedores únicos
+    const proveedoresUnicos = Array.from(new Set(data.map(item => item.PROVEEDOR).filter(Boolean)));
+
+    // Lista de tallas
+    const tallas = Array.from({ length: 31 }, (_, i) => 18 + i); // [18, ..., 48]
+
+    // Determinar qué tallas tienen datos en al menos un registro
+    const tallasVisibles = tallas.filter(talla => {
+        const campo = `T${talla}`;
+        return data.some(item => item[campo] !== null && item[campo] !== 0);
+    });
+
+    // Fila de proveedor
+    const filaProveedor = `
+        <tr>
+            <td colspan="100%" style="font-weight: bold; background-color: #f0f0f0; padding: 10px; text-align: left;">
+                EXISTENCIAS DEL PROVEEDOR: ${proveedoresUnicos.join(', ')}
+            </td>
+        </tr>
+    `;
+
+    // Generar encabezados dinámicos
+    let tableHtml = `
+        <table>
+            <thead>
+                ${filaProveedor}
                 <tr>
-                    <td colspan="100%" style="font-weight: bold; background-color: #f0f0f0; padding: 10px; text-align: left;">
-                        EXISTENCIAS DEL PROVEEDOR: ${proveedoresUnicos.join(', ')}
-                    </td>
+                    <th style="font-size: 12px">CODARTICULO</th>
+                    <th style="font-size: 12px">REFERENCIA</th>
+                    <th style="font-size: 12px">DESCRIPCION</th>
+                    ${tallasVisibles.map(t => `<th style="font-size: 12px">${t}</th>`).join('')}
+                    <th style="font-size: 12px">TOTAL</th>
+                    <th style="font-size: 12px">PVP</th>
+                    <th style="font-size: 12px">TEMPORADA</th>
+                    <th style="font-size: 12px"></th>
                 </tr>
-            `;
+            </thead>
+            <tbody>
+    `;
 
+    // Filas
+    data.forEach((record, index) => {
+        tableHtml += `
+            <tr id="existencia-row-${index}">
+                <td style="font-size: 10px">${record.CODARTICULO}</td>
+                <td style="font-size: 10px">${record.REFERENCIA}</td>
+                <td style="font-size: 10px">${record.DESCRIPCION}</td>
+                ${tallasVisibles.map(t => {
+                    const campo = `T${t}`;
+                    const valor = record[campo];
+                    const tieneStock = valor !== null && valor !== 0;
+                    const bgColor = tieneStock ? 'yellow' : 'transparent';
+                    return `<td style="font-size: 10px; background-color: ${bgColor}; color: black;">${tieneStock ? valor : ''}</td>`;
+                }).join('')}
+                <td style="font-size: 10px">${record.TOTAL}</td>
+                <td style="font-size: 10px">${record.PVP}</td>
+                <td style="font-size: 10px">${record.TEMPORADA}</td>
+                <td><button class="button_stock" onclick="showDetailsStocks('${record.REFERENCIA}', ${index})">Stocks</button></td>
+            </tr>
+        `;
+    });
 
-            // Crear la tabla con encabezados fijos
-            let tableHtml = `
-               <table>
-                    <thead>
-                        ${filaProveedor}
-                        <tr>
-                            <th style="font-size: 12px">CODARTICULO</th>
-                            <th style="font-size: 12px">REFERENCIA</th>
-                            <th style="font-size: 12px">DESCRIPCION</th>
-                            <th style="font-size: 12px">18</th>
-                            <th style="font-size: 12px">19</th>
-                            <th style="font-size: 12px">20</th>
-                            <th style="font-size: 12px">21</th>
-                            <th style="font-size: 12px">22</th>
-                            <th style="font-size: 12px">23</th>
-                            <th style="font-size: 12px">24</th>
-                            <th style="font-size: 12px">25</th>
-                            <th style="font-size: 12px">26</th>
-                            <th style="font-size: 12px">27</th>
-                            <th style="font-size: 12px">28</th>
-                            <th style="font-size: 12px">29</th>
-                            <th style="font-size: 12px">30</th>
-                            <th style="font-size: 12px">31</th>
-                            <th style="font-size: 12px">32</th>
-                            <th style="font-size: 12px">33</th>
-                            <th style="font-size: 12px">34</th>
-                            <th style="font-size: 12px">35</th>
-                            <th style="font-size: 12px">36</th>
-                            <th style="font-size: 12px">37</th>
-                            <th style="font-size: 12px">38</th>
-                            <th style="font-size: 12px">39</th>
-                            <th style="font-size: 12px">40</th>
-                            <th style="font-size: 12px">41</th>
-                            <th style="font-size: 12px">42</th>
-                            <th style="font-size: 12px">43</th>
-                            <th style="font-size: 12px">44</th>
-                            <th style="font-size: 12Px">45</th>
-                            <th style="font-size: 12px">46</th>
-                            <th style="font-size: 12px">47</th>
-                            <th style="font-size: 12px">48</th>
-                            <th style="font-size: 12px">TOTAL</th>
-                            <th style="font-size: 12px">PVP</th>
-                            <th style="font-size: 12px">TEMPORADA</th>
-                            <th style="font-size: 12px"></th>
-                        </tr>
-                    </thead>
-                <tbody>
-            `;
+    tableHtml += `
+            </tbody>
+        </table>
+    `;
 
-            // Iterar sobre cada registro y agregarlo como una fila
-            data.forEach((record, index) => {
-                tableHtml += `
-                    <tr id="existencia-row-${index}">
-                            <td style="font-size: 10px">${record.CODARTICULO}</td>
-                            <td style="font-size: 10px">${record.REFERENCIA}</td>
-                            <td style="font-size: 10px">${record.DESCRIPCION}</td>
-                            <td style="font-size: 10px; background-color: ${record.T18 !== null && record.T18 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T18 !== null && record.T18 !== 0 ? 'black' : 'black'};">${record.T18 === null || record.T18 === 0 ? '' : record.T18}</td>
-                            <td style="font-size: 10px; background-color: ${record.T19 !== null && record.T19 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T19 !== null && record.T19 !== 0 ? 'black' : 'black'};">${record.T19 === null || record.T19 === 0 ? '' : record.T19}</td>
-                            <td style="font-size: 10px; background-color: ${record.T20 !== null && record.T20 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T20 !== null && record.T20 !== 0 ? 'black' : 'black'};">${record.T20 === null || record.T20 === 0 ? '' : record.T20}</td>
-                            <td style="font-size: 10px; background-color: ${record.T21 !== null && record.T21 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T21 !== null && record.T21 !== 0 ? 'black' : 'black'};">${record.T21 === null || record.T21 === 0 ? '' : record.T21}</td>
-                            <td style="font-size: 10px; background-color: ${record.T22 !== null && record.T22 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T22 !== null && record.T22 !== 0 ? 'black' : 'black'};">${record.T22 === null || record.T22 === 0 ? '' : record.T22}</td>
-                            <td style="font-size: 10px; background-color: ${record.T23 !== null && record.T23 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T23 !== null && record.T23 !== 0 ? 'black' : 'black'};">${record.T23 === null || record.T23 === 0 ? '' : record.T23}</td>
-                            <td style="font-size: 10px; background-color: ${record.T24 !== null && record.T24 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T24 !== null && record.T24 !== 0 ? 'black' : 'black'};">${record.T24 === null || record.T24 === 0 ? '' : record.T24}</td>
-                            <td style="font-size: 10px; background-color: ${record.T25 !== null && record.T25 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T25 !== null && record.T25 !== 0 ? 'black' : 'black'};">${record.T25 === null || record.T25 === 0 ? '' : record.T25}</td>
-                            <td style="font-size: 10px; background-color: ${record.T26 !== null && record.T26 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T26 !== null && record.T26 !== 0 ? 'black' : 'black'};">${record.T26 === null || record.T26 === 0 ? '' : record.T26}</td>
-                            <td style="font-size: 10px; background-color: ${record.T27 !== null && record.T27 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T27 !== null && record.T27 !== 0 ? 'black' : 'black'};">${record.T27 === null || record.T27 === 0 ? '' : record.T27}</td>
-                            <td style="font-size: 10px; background-color: ${record.T28 !== null && record.T28 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T28 !== null && record.T28 !== 0 ? 'black' : 'black'};">${record.T28 === null || record.T28 === 0 ? '' : record.T28}</td>
-                            <td style="font-size: 10px; background-color: ${record.T29 !== null && record.T29 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T29 !== null && record.T29 !== 0 ? 'black' : 'black'};">${record.T29 === null || record.T29 === 0 ? '' : record.T29}</td>
-                            <td style="font-size: 10px; background-color: ${record.T30 !== null && record.T30 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T30 !== null && record.T30 !== 0 ? 'black' : 'black'};">${record.T30 === null || record.T30 === 0 ? '' : record.T30}</td>
-                            <td style="font-size: 10px; background-color: ${record.T31 !== null && record.T31 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T31 !== null && record.T31 !== 0 ? 'black' : 'black'};">${record.T31 === null || record.T31 === 0 ? '' : record.T31}</td>
-                            <td style="font-size: 10px; background-color: ${record.T32 !== null && record.T32 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T32 !== null && record.T32 !== 0 ? 'black' : 'black'};">${record.T32 === null || record.T32 === 0 ? '' : record.T32}</td>
-                            <td style="font-size: 10px; background-color: ${record.T33 !== null && record.T33 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T33 !== null && record.T33 !== 0 ? 'black' : 'black'};">${record.T33 === null || record.T33 === 0 ? '' : record.T33}</td>
-                            <td style="font-size: 10px; background-color: ${record.T34 !== null && record.T34 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T34 !== null && record.T34 !== 0 ? 'black' : 'black'};">${record.T34 === null || record.T34 === 0 ? '' : record.T34}</td>
-                            <td style="font-size: 10px; background-color: ${record.T35 !== null && record.T35 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T35 !== null && record.T35 !== 0 ? 'black' : 'black'};">${record.T35 === null || record.T35 === 0 ? '' : record.T35}</td>
-                            <td style="font-size: 10px; background-color: ${record.T36 !== null && record.T36 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T36 !== null && record.T36 !== 0 ? 'black' : 'black'};">${record.T36 === null || record.T36 === 0 ? '' : record.T36}</td>
-                            <td style="font-size: 10px; background-color: ${record.T37 !== null && record.T37 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T37 !== null && record.T37 !== 0 ? 'black' : 'black'};">${record.T37 === null || record.T37 === 0 ? '' : record.T37}</td>
-                            <td style="font-size: 10px; background-color: ${record.T38 !== null && record.T38 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T38 !== null && record.T38 !== 0 ? 'black' : 'black'};">${record.T38 === null || record.T38 === 0 ? '' : record.T38}</td>
-                            <td style="font-size: 10px; background-color: ${record.T39 !== null && record.T39 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T39 !== null && record.T39 !== 0 ? 'black' : 'black'};">${record.T39 === null || record.T39 === 0 ? '' : record.T39}</td>
-                            <td style="font-size: 10px; background-color: ${record.T40 !== null && record.T40 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T40 !== null && record.T40 !== 0 ? 'black' : 'black'};">${record.T40 === null || record.T40 === 0 ? '' : record.T40}</td>
-                            <td style="font-size: 10px; background-color: ${record.T41 !== null && record.T41 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T41 !== null && record.T41 !== 0 ? 'black' : 'black'};">${record.T41 === null || record.T41 === 0 ? '' : record.T41}</td>
-                            <td style="font-size: 10px; background-color: ${record.T42 !== null && record.T42 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T42 !== null && record.T42 !== 0 ? 'black' : 'black'};">${record.T42 === null || record.T42 === 0 ? '' : record.T42}</td>
-                            <td style="font-size: 10px; background-color: ${record.T43 !== null && record.T43 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T43 !== null && record.T43 !== 0 ? 'black' : 'black'};">${record.T43 === null || record.T43 === 0 ? '' : record.T43}</td>
-                            <td style="font-size: 10px; background-color: ${record.T44 !== null && record.T44 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T44 !== null && record.T44 !== 0 ? 'black' : 'black'};">${record.T44 === null || record.T44 === 0 ? '' : record.T44}</td>
-                            <td style="font-size: 10px; background-color: ${record.T45 !== null && record.T45 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T45 !== null && record.T45 !== 0 ? 'black' : 'black'};">${record.T45 === null || record.T45 === 0 ? '' : record.T45}</td>
-                            <td style="font-size: 10px; background-color: ${record.T46 !== null && record.T46 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T46 !== null && record.T46 !== 0 ? 'black' : 'black'};">${record.T46 === null || record.T46 === 0 ? '' : record.T46}</td>
-                            <td style="font-size: 10px; background-color: ${record.T47 !== null && record.T47 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T47 !== null && record.T47 !== 0 ? 'black' : 'black'};">${record.T47 === null || record.T47 === 0 ? '' : record.T47}</td>
-                            <td style="font-size: 10px; background-color: ${record.T48 !== null && record.T48 !== 0 ? 'yellow' : 'transparent'}; color: ${record.T48 !== null && record.T48 !== 0 ? 'black' : 'black'};">${record.T48 === null || record.T48 === 0 ? '' : record.T48}</td>
-                            <td style="font-size: 10px">${record.TOTAL}</td>
-                            <td style="font-size: 10px">${record.PVP}</td>
-                            <td style="font-size: 10px">${record.TEMPORADA}</td>
-                            <td><button class="button_stock" onclick="showDetailsStocks('${record.REFERENCIA}', ${index})">Stocks</button></td>
-                        </tr>
-                `;
-            });
-
-            // Cerrar la tabla
-            tableHtml += `
-                    </tbody>
-                </table>
-            `;
-
-            // Agregar la tabla al contenedor
-            let filtrosHtml = `
-    <strong>Filtrar por temporada:</strong>
-    <label><input type="checkbox" value="V25" onchange="filtrarPorTemporada()"> V25</label>
-    <label><input type="checkbox" value="V14" onchange="filtrarPorTemporada()"> V14</label>
-`;
-document.getElementById("filtros-temporada").innerHTML = filtrosHtml;
-tableContainer.innerHTML = tableHtml;
-
-        }
+    // Filtros de temporada (estáticos por ahora)
+    let filtrosHtml = `
+        <strong>Filtrar por temporada:</strong>
+        <label><input type="checkbox" value="V25" onchange="filtrarPorTemporada()"> V25</label>
+        <label><input type="checkbox" value="V14" onchange="filtrarPorTemporada()"> V14</label>
+    `;
+    document.getElementById("filtros-temporada").innerHTML = filtrosHtml;
+    tableContainer.innerHTML = tableHtml;
+}
+// fin mi codigo
 
         // Función para llamar a una API específica por fila
         async function showDetailsStocks(referencia, index) {
@@ -948,37 +975,6 @@ function generarCheckboxTemporadas() {
     // Aplicar filtro automáticamente
     filtrarPorTemporada();
 }
-
-function exportarTablaAExcel() {
-    const tabla = document.querySelector("#table-container table");
-    if (!tabla) return alert("No hay tabla para exportar.");
-
-    let csv = [];
-    for (let fila of tabla.rows) {
-        let row = [];
-        for (let celda of fila.cells) {
-            row.push('"' + celda.innerText.replace(/"/g, '""') + '"');
-        }
-        csv.push(row.join(","));
-    }
-
-    const blob = new Blob([csv.join("\n")], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "existencias.csv";
-    link.click();
-}
-
-document.getElementById("fetch-json").addEventListener("click", () => {
-    const fechaInput = document.getElementById("fecha-ventas");
-    const tableContainer = document.getElementById("table-container");
-
-    if (!fechaInput.value) {
-        tableContainer.innerHTML = "<p class='error'>Selecciona una fecha antes de continuar.</p>";
-    }
-});
 
 
 async function fetchCuadroBeneficios() {
@@ -1481,6 +1477,9 @@ document.getElementById("btn-historico").addEventListener("click", generateHisto
 
 
 async function generateHistoricoStock() {
+    //limpiamos los filtros por temporada 
+    document.getElementById("filtros-temporada").innerHTML = "";
+
     const referencia = prompt("Introduce la referencia o código de barras del artículo:");
     if (!referencia || referencia.trim() === "") {
         tableContainer.innerHTML = '<p class="error">Operación cancelada. No se proporcionó una referencia.</p>';
@@ -1574,7 +1573,7 @@ function renderHistoricoStock(data) {
 
 
     // Construcción de tabla
-    let tableHtml = `<table><thead><tr>`;
+    let tableHtml = `<table><thead>`;
 
     // Fila de título
     const referencia = data[0].REFPROVEEDOR || "";
@@ -1672,6 +1671,9 @@ function formatearFecha(fechaISO) {
 
 
 document.getElementById("btn-consulta").addEventListener("click", async () => {
+    //limpiar contenedor de filtros por si se uso antes y no arrastrarlo
+    document.getElementById("filtros-temporada").innerHTML = "";
+
     const referencia = prompt("Introduce la referencia o código de barras del artículo:");
     if (!referencia || referencia.trim() === "") {
         tableContainer.innerHTML = '<p class="error">Consulta cancelada. No se proporcionó una referencia.</p>';
@@ -1700,18 +1702,405 @@ document.getElementById("btn-consulta").addEventListener("click", async () => {
     }
 });
 
+// Mi codigo
+// Evento click para el botón mostrar producto-temporada
+document.getElementById("btn-catalog").addEventListener("click", () => {
+    //limpiar contenedor de filtros por si se uso antes y no arrastrarlo
+    document.getElementById("filtros-temporada").innerHTML = "";
+
+    // Crear el modal dinámicamente
+    const modal = document.createElement("div");
+    modal.id = "tipo-modal";
+    modal.style = `
+        position: fixed;
+        inset: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+    `;
+
+    const content = document.createElement("div");
+    content.style = `
+        background-color: white;
+        padding: 20px 30px;
+        border-radius: 12px;
+        text-align: center;
+        max-width: 300px;
+        font-family: sans-serif;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    `;
+    content.innerHTML = `<p>¿Cómo deseas consultar el catálogo?</p>`;
+
+    const btnsContainer = document.createElement("div");
+    btnsContainer.style = `margin-top: 10px;`;
+
+    const btnTemporada = document.createElement("button");
+    btnTemporada.textContent = "Temporada";
+    btnTemporada.style = "margin: 10px; padding: 10px 15px; font-weight: bold; cursor: pointer;";
+
+    const btnProveedor = document.createElement("button");
+    btnProveedor.textContent = "Proveedor";
+    btnProveedor.style = "margin: 10px; padding: 10px 15px; font-weight: bold; cursor: pointer;";
+
+    btnsContainer.appendChild(btnTemporada);
+    btnsContainer.appendChild(btnProveedor);
+    content.appendChild(btnsContainer);
+    modal.appendChild(content);
+    document.body.appendChild(modal);
+
+    const handleSeleccion = async (tipoSeleccionado) => {
+        document.body.removeChild(modal);
+
+        const codigo = prompt(`Introduce el código de ${tipoSeleccionado === "T" ? "TEMPORADA" : "PROVEEDOR"}:`)?.toUpperCase();
+        if (!codigo || codigo.trim() === "") {
+            tableContainer.innerHTML = '<p class="error">Consulta cancelada. No se proporcionó código.</p>';
+            return;
+        }
+
+        tableContainer.innerHTML = "Cargando imágenes del catálogo...";
+
+        //ruta para pruebas en local para desarrollo
+        /* const ruta = tipoSeleccionado === "T"
+            ? `http://localhost:5000/catalogo-temporada?referencia=${codigo}`
+            : `http://localhost:5000/catalogo-proveedor?codigo=${codigo}`; */ 
+        //ruta remota para probar en producción https://abincodigital.loclx.io 
+        const ruta = tipoSeleccionado === "T"
+            ? `https://abincodigital.loclx.io/catalogo-temporada?referencia=${codigo}`
+            : `https://abincodigital.loclx.io/catalogo-proveedor?codigo=${codigo}`;  
+
+        // Añadir parámetro de rebajas si está activado
+        if (soloRebajas) {
+            url += `&rebajas=true`;
+        }
+       
+        try {
+            const response = await fetch(ruta);
+            if (!response.ok) throw new Error("Error al obtener las imágenes");
+
+            const result = await response.json();
+            const titulo = `CATÁLOGO DE ${tipoSeleccionado === "T" ? "TEMPORADA" : "PROVEEDOR"} - OUTLETSHOES`;
+
+            tableContainer.innerHTML = `
+                <h2 id="catalogo-id">${titulo}</h2>
+                ${renderCatalogo(result.data)}
+            `;
+
+            //Aplicar filtro solo si es búsqueda por proveedor
+            if (tipoSeleccionado === "P") {
+            generarCheckboxCatalogoTemporadas(result.data);
+        }
+
+        } catch (error) {
+            tableContainer.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+        }
+    };
+
+    btnTemporada.onclick = () => handleSeleccion("T");
+    btnProveedor.onclick = () => handleSeleccion("P");
+});
+     
+           
+//Función para generar checkbox de catalogo proveedor
+function generarCheckboxCatalogoTemporadas(data) {
+    const contenedor = document.getElementById("filtros-temporada");
+    if (!contenedor) return;
+
+    const temporadasUnicas = new Set(
+        data.map(item => (item.temporada || "").toUpperCase().trim()).filter(Boolean)
+    );
+
+    contenedor.innerHTML = "<strong>Filtrar por temporada:</strong><br>";
+    [...temporadasUnicas].sort().forEach(temp => {
+        const id = "chk_" + temp.replace(/\s+/g, "_");
+        contenedor.innerHTML += `
+            <label style="margin-right: 10px;">
+                <input type="checkbox" value="${temp}" onchange="filtrarCatalogoPorTemporada()"> ${temp}
+            </label>
+        `;
+    });
+}
+//función para filtrar por temporada en catalogo proveedor
+function filtrarCatalogoPorTemporada() {
+    const seleccionadas = Array.from(document.querySelectorAll('#filtros-temporada input[type="checkbox"]:checked'))
+        .map(chk => chk.value.toUpperCase());
+
+    document.querySelectorAll('#galeria .card').forEach(card => {
+        const temporada = (card.getAttribute("data-temporada") || "").toUpperCase().trim();
+        const visible = seleccionadas.length === 0 || seleccionadas.includes(temporada);
+        card.style.display = visible ? "" : "none";
+    });
+}
+
+
+//Función modificada para incluir cantidad de stock por tallas entre parentesis
+function renderCatalogo(data) {
+    if (!Array.isArray(data) || data.length === 0) return "<p>Sin datos</p>";
+
+    const imagenGenerica = "http://localhost:5000/imagen-generica";
+
+    const articulosMap = new Map();
+
+    data.forEach(item => {
+        const cod = item.codarticulo;
+
+        if (!articulosMap.has(cod)) {
+            articulosMap.set(cod, {
+                descripcion: item.descripcion,
+                referencia: item.referencia,
+                foto: item.foto,
+                pbruto: item.pbruto,
+                preb: item.preb,  // Añadimos el precio rebajado
+                tallas: {}, // ← cambiamos de Set a objeto
+                temporada: item.temporada
+            });
+        }
+
+        const articulo = articulosMap.get(cod);
+        const talla = item.talla;
+        if (talla) {
+            articulo.tallas[talla] = (articulo.tallas[talla] || 0) + 1;
+        }
+    });
+
+    let html = `<div id="galeria" style="
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        padding: 20px;
+    ">`;
+
+    articulosMap.forEach((articulo, cod) => {
+        const imagenSrc = articulo.foto
+            ? `data:image/jpeg;base64,${articulo.foto}`
+            : imagenGenerica;
+
+        const precio = articulo.pbruto !== null
+            ? `<p style="font-weight: bold; color: #222; margin: 8px 0 0; text-align: left;">PVP: ${articulo.pbruto.toFixed(2)} €</p>`
+            : "";
+
+        const tallasTexto = Object.entries(articulo.tallas)
+            .map(([talla, cantidad]) => `${talla} (${cantidad})`)
+            .join(', ');
+
+        html += `
+            <div class="card" data-temporada="${articulo.temporada || ''}" style="
+                background: #fff;
+                border-radius: 12px;
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+                padding: 15px;
+                text-align: center;
+                transition: transform 0.2s;
+            "
+            onmouseover="this.style.transform='scale(1.02)'"
+            onmouseout="this.style.transform='scale(1)'"
+            >
+                <img src="${imagenSrc}" 
+                     alt="Imagen del artículo" 
+                     style="width: 100%; height: auto; border-radius: 8px; object-fit: cover; max-height: 200px;">
+    
+                <h3 style="margin: 10px 0 5px;">${articulo.referencia}</h3>
+                <p style="color: #666; font-size: 0.9em; text-align: left;">${articulo.descripcion}</p>
+                ${precio}
+                <div style="margin-top: 10px;">
+                    <span style="font-weight: bold;">Tallas disponibles:</span><br>
+                    <span style="display: inline-block; margin-top: 5px; color: #444;">
+                        ${tallasTexto}
+                    </span>
+                </div>
+            </div>
+        `;
+    });
+
+    html += `</div>`;
+    return html;
+}
+
+
+//Evento para generar catálogo en pdf 
+document.getElementById("btn-export-pdf").addEventListener("click", async () => {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF("p", "mm", "a4");
+
+    const catalogoElement = document.getElementById("galeria");
+    if (!catalogoElement) {
+        alert("No hay catálogo cargado.");
+        return;
+    }
+
+    const tituloElement = document.getElementById("catalogo-id");
+    const titulo = tituloElement ? tituloElement.textContent.trim() : "CATÁLOGO DE PRODUCTOS";
+
+    //const cards = catalogoElement.querySelectorAll(".card");//mi codigo pequeña modificación
+    //midificación para que no imprima las cartas ocultas en el DOM
+    const cards = Array.from(catalogoElement.querySelectorAll(".card")).filter(card => card.style.display !== "none");
+
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 5;
+
+    const cols = 4;
+    const rows = 4;
+    const cardWidth = (pageWidth - margin * 2 - (cols - 1) * 5) / cols;
+    const cardHeight = (pageHeight - margin * 2 - (rows - 1) * 10) / rows;
+
+    let x = margin;
+    let y = margin;
+    let col = 0;
+    let row = 0;
+
+    // Título dinámico desde el DOM
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(40);
+    doc.text(titulo, margin + 10, 15);
+
+    const fecha = new Date().toLocaleDateString();
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text(`Fecha de generación: ${fecha}`, margin + 10, 22);
+
+    y = 30;
+
+    for (const card of cards) {
+    const imgEl = card.querySelector("img");
+    const h3 = card.querySelector("h3");
+    const desc = h3?.textContent.trim() || "";
+    const cod = card.querySelector("p")?.textContent.trim() || "";
+    const tallas = card.querySelector("span:last-of-type")?.textContent.trim() || "";
+    const precioEl = card.querySelector("p:nth-of-type(2)");
+    const precio = precioEl ? precioEl.textContent.trim() : "";
+
+    const imgSrc = imgEl?.src || "";
+    const isBase64 = imgSrc.startsWith("data:image");
+    const finalImage = isBase64 ? imgSrc : "http://localhost:5000/imagen-generica";
+
+    let base64Image = finalImage;
+    if (!isBase64) {
+        base64Image = await toDataUrl(finalImage);
+    }
+
+    // Dibujar borde de la tarjeta
+    doc.setDrawColor(200);
+    doc.rect(x - 1, y - 1, cardWidth + 2, cardHeight + 2);
+
+    const imgHeight = cardHeight * 0.5;
+    doc.addImage(base64Image, "JPEG", x, y, cardWidth, imgHeight);
+
+    doc.setFontSize(7);
+
+    // Descripción en negrita
+    doc.setFont("helvetica", "bold");
+    doc.text(desc, x, y + imgHeight + 5, { maxWidth: cardWidth });
+
+    // Descripción adicional (código) y precio
+    doc.setFont("helvetica", "normal");
+    doc.text(cod, x, y + imgHeight + 12, { maxWidth: cardWidth });
+    if (precio) {
+        doc.text(precio, x, y + imgHeight + 17, { maxWidth: cardWidth });
+    }
+
+    doc.text("Tallas: " + tallas, x, y + imgHeight + 23, { maxWidth: cardWidth });
+
+    col++;
+    if (col >= cols) {
+        col = 0;
+        row++;
+        x = margin;
+        y += cardHeight + 3;
+    } else {
+        x += cardWidth + 5;
+    }
+
+    if (row >= rows) {
+        doc.addPage();
+        row = 0;
+        col = 0;
+        x = margin;
+        y = margin;
+    }
+}
+
+
+    doc.save("catalogo_productos.pdf");
+});
+
+//fin mi codigo
+
+
+
+async function toDataUrl(url) {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+    });
+}
+
+
+
+async function toDataUrl(url) {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+    });
+}
+// Fin mi código
+
+
+// mi codigo 
+//modificacion función renderMiniTable para eliminar columnas vacias
 function renderMiniTable(data, tipo = "") {
     if (!Array.isArray(data) || data.length === 0) return "<p>Sin datos</p>";
 
-    const headers = Object.keys(data[0]);
+    // Definir columnas fijas al principio y al final
+    const columnasInicio = tipo === "stock"
+        ? ["DESCRIPCION", "REFERENCIA"]
+        : ["DESCRIPCION", "REFPROVEEDOR"];
+    const columnasFinal = ["TIENDA", "TOTAL"];
+
+    // Detectar columnas de tallas con datos relevantes
+    const columnasConDatos = new Set();
+    const todasLasColumnas = Object.keys(data[0]);
+
+    todasLasColumnas.forEach(col => {
+        if (!columnasInicio.includes(col) && !columnasFinal.includes(col)) {
+            for (const row of data) {
+                if (row[col] !== 0 && row[col] !== null) {
+                    columnasConDatos.add(col);
+                    break;
+                }
+            }
+        }
+    });
+
+    // Combinar en  orden inicio + tallas + final
+    const columnasVisibles = [
+        ...columnasInicio,
+        ...[...columnasConDatos].sort((a, b) => {
+            const nA = parseInt(a.replace('T', ''));
+            const nB = parseInt(b.replace('T', ''));
+            return isNaN(nA) || isNaN(nB) ? a.localeCompare(b) : nA - nB;
+        }),
+        ...columnasFinal
+    ];
+
+    // Generar HTML de la tabla
     let html = "<table><thead><tr>";
-    headers.forEach(h => html += `<th>${h}</th>`);
+    columnasVisibles.forEach(col => html += `<th>${col}</th>`);
     html += "</tr></thead><tbody>";
 
     data.forEach(row => {
         html += "<tr>";
-        headers.forEach(h => {
-            const valor = row[h];
+        columnasVisibles.forEach(col => {
+            const valor = row[col];
             const mostrar = (valor === 0 || valor === null) ? "" : valor;
             let bgColor = "transparent";
 
@@ -1727,6 +2116,9 @@ function renderMiniTable(data, tipo = "") {
     html += "</tbody></table>";
     return html;
 }
+
+
+// Fin mi código
 
 
 function imprimirTicket() {
